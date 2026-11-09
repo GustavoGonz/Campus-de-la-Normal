@@ -1,20 +1,49 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
-import { Lock, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import { InstitutionalLogo } from '../../components/common/InstitutionalLogo';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
 export const ResetPasswordPage = () => {
-  const { updatePassword } = useAuth();
+  const { updatePassword, verifyAuthCallback } = useAuth();
   const { showToast } = useNotifications();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verifyingToken, setVerifyingToken] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [success, setSuccess] = useState(false);
+
+  // Si la redirección de correo incluye código PKCE o token_hash de recuperación, validarlo automáticamente
+  useEffect(() => {
+    let active = true;
+    const hasRecoveryParams =
+      location.search.includes('code=') ||
+      location.search.includes('token_hash=') ||
+      window.location.hash.includes('access_token=');
+
+    if (!hasRecoveryParams) return;
+
+    const validateRecoverySession = async () => {
+      setVerifyingToken(true);
+      const res = await verifyAuthCallback(location.search, window.location.hash);
+      if (!active) return;
+      setVerifyingToken(false);
+      if (!res.success && res.error) {
+        setErrorMsg(res.error);
+      }
+    };
+
+    validateRecoverySession();
+    return () => {
+      active = false;
+    };
+  }, [location.search, verifyAuthCallback]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,8 +67,8 @@ export const ResetPasswordPage = () => {
       setSuccess(true);
       showToast('¡Contraseña restablecida con éxito!', 'success');
       setTimeout(() => {
-        navigate('/panel');
-      }, 2500);
+        navigate('/panel', { replace: true });
+      }, 2000);
     } else {
       setErrorMsg(res.error || 'No se pudo actualizar la contraseña. El enlace puede haber caducado.');
     }
@@ -67,16 +96,18 @@ export const ResetPasswordPage = () => {
         </div>
 
         <div className="card" style={{ padding: '2rem' }}>
-          {success ? (
+          {verifyingToken ? (
+            <LoadingSpinner text="Validando enlace seguro de recuperación..." />
+          ) : success ? (
             <div style={{ textAlign: 'center', padding: '1rem 0' }}>
               <CheckCircle size={48} color="var(--success-600)" style={{ margin: '0 auto 1rem' }} />
               <h2 style={{ fontSize: '1.3rem', color: 'var(--primary-900)', marginBottom: '0.5rem' }}>
                 ¡Contraseña Actualizada!
               </h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                Tu contraseña fue cambiada exitosamente. Te estamos redirigiendo a tu espacio...
+                Tu contraseña fue cambiada exitosamente. Redirigiendo a tu panel...
               </p>
-              <button onClick={() => navigate('/panel')} className="btn btn-primary" style={{ width: '100%' }}>
+              <button onClick={() => navigate('/panel', { replace: true })} className="btn btn-primary" style={{ width: '100%' }}>
                 Ingresar al Campus
               </button>
             </div>
@@ -90,14 +121,16 @@ export const ResetPasswordPage = () => {
               )}
 
               <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-                Ingresá tu nueva clave segura para tu cuenta institucional.
+                Ingresá tu nueva contraseña segura para tu cuenta institucional.
               </p>
 
               <div className="form-group">
-                <label className="form-label">Nueva Contraseña</label>
+                <label className="form-label" htmlFor="reset-new-password">Nueva Contraseña</label>
                 <input
+                  id="reset-new-password"
                   type="password"
                   required
+                  minLength={6}
                   className="form-input"
                   placeholder="Mínimo 6 caracteres"
                   value={password}
@@ -106,10 +139,12 @@ export const ResetPasswordPage = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Confirmar Nueva Contraseña</label>
+                <label className="form-label" htmlFor="reset-confirm-password">Confirmar Nueva Contraseña</label>
                 <input
+                  id="reset-confirm-password"
                   type="password"
                   required
+                  minLength={6}
                   className="form-input"
                   placeholder="Repetí la nueva contraseña"
                   value={confirmPassword}
@@ -123,7 +158,7 @@ export const ResetPasswordPage = () => {
                 style={{ width: '100%', marginTop: '0.5rem' }}
                 disabled={loading}
               >
-                {loading ? 'Guardando nueva clave...' : 'Actualizar Contraseña'}
+                {loading ? 'Guardando nueva contraseña...' : 'Actualizar Contraseña'}
               </button>
 
               <div style={{ textAlign: 'center', marginTop: '1.25rem' }}>
@@ -138,4 +173,3 @@ export const ResetPasswordPage = () => {
     </div>
   );
 };
-

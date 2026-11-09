@@ -1,32 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../context/NotificationContext';
 import { adminService } from '../../services/adminService';
 import { subjectService } from '../../services/subjectService';
 import { 
-  Shield, 
   Users, 
   BookOpen, 
   GraduationCap, 
   Plus, 
-  Check, 
-  X, 
   UserCheck, 
   UserX,
-  AlertTriangle,
-  FolderCheck,
   Search,
-  Filter
+  Sparkles
 } from 'lucide-react';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { Modal } from '../../components/common/Modal';
 import { InstitutionalLogo } from '../../components/common/InstitutionalLogo';
+import { AITutorPage } from '../ai/AITutorPage';
+
+const getTabFromPath = (pathname) => {
+  if (pathname.includes('/admin/materias')) return 'subjects';
+  if (pathname.includes('/admin/cursos')) return 'courses';
+  if (pathname.includes('/admin/tutor')) return 'tutor';
+  return 'users';
+};
 
 export const AdminPanel = () => {
-  const { user } = useAuth();
   const { showToast } = useNotifications();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState('users'); // 'users', 'subjects', 'courses'
+  const [activeTab, setActiveTab] = useState(() => getTabFromPath(location.pathname)); // 'users', 'subjects', 'courses', 'tutor'
   const [users, setUsers] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -49,7 +53,7 @@ export const AdminPanel = () => {
     access_type: 'request_only',
   });
 
-  const loadAdminData = async () => {
+  const loadAdminData = useCallback(async () => {
     setLoading(true);
     try {
       const [uList, sList, cList] = await Promise.all([
@@ -66,11 +70,15 @@ export const AdminPanel = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     loadAdminData();
-  }, []);
+  }, [loadAdminData]);
+
+  useEffect(() => {
+    setActiveTab(getTabFromPath(location.pathname));
+  }, [location.pathname]);
 
   // Actualizar rol de usuario (Estudiante, Docente, Administrador, Invitado)
   const handleRoleChange = async (userId, newRole) => {
@@ -84,7 +92,7 @@ export const AdminPanel = () => {
       };
       showToast(`Rol actualizado a ${roleLabels[newRole] || newRole}.`, 'success');
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
-    } catch (err) {
+    } catch {
       showToast('Error al modificar rol.', 'error');
     }
   };
@@ -185,7 +193,21 @@ export const AdminPanel = () => {
             </p>
           </div>
         </div>
+
+        <button
+          onClick={() => navigate('/tutor-ia')}
+          className="btn btn-accent"
+        >
+          <Sparkles size={16} /> Tutor IA Pantalla Completa
+        </button>
       </div>
+
+      {/* Tutor IA Unificado Integrado en el Panel Principal Administrativo (/panel) */}
+      {location.pathname === '/panel' && activeTab !== 'tutor' && (
+        <section style={{ marginBottom: '2rem' }} aria-label="Tutor IA Pedagógico Institucional">
+          <AITutorPage embedded={true} fullWidth={true} />
+        </section>
+      )}
 
       {/* Tabs Principales */}
       <div className="tabs-container">
@@ -206,6 +228,12 @@ export const AdminPanel = () => {
           onClick={() => setActiveTab('courses')}
         >
           <GraduationCap size={18} /> Cursos y Divisiones ({courses.length})
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'tutor' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tutor')}
+        >
+          <Sparkles size={18} /> Tutor IA Institucional
         </button>
       </div>
 
@@ -275,8 +303,8 @@ export const AdminPanel = () => {
             </div>
           </div>
 
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: '640px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
               <thead>
                 <tr style={{ backgroundColor: 'var(--bg-muted)', borderBottom: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>
                   <th style={{ padding: '0.85rem 1.25rem', fontWeight: 600 }}>Usuario</th>
@@ -346,8 +374,8 @@ export const AdminPanel = () => {
             </button>
           </div>
 
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: '640px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
               <thead>
                 <tr style={{ backgroundColor: 'var(--bg-muted)', borderBottom: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>
                   <th style={{ padding: '0.85rem 1.25rem', fontWeight: 600 }}>Materia</th>
@@ -401,6 +429,13 @@ export const AdminPanel = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* TAB 4: TUTOR IA INSTITUCIONAL */}
+      {activeTab === 'tutor' && (
+        <div>
+          <AITutorPage embedded={true} fullWidth={true} />
         </div>
       )}
 

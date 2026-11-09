@@ -3,33 +3,29 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { subjectService } from '../../services/subjectService';
 import { classService } from '../../services/classService';
-import { 
-  Calendar as CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight, 
-  BookOpen, 
-  Clock, 
-  Filter 
+import {
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
 export const CalendarPage = () => {
-  const { user, isTeacher, isGuest, isAdmin } = useAuth();
+  const { user, isAuthenticated, isTeacher, isGuest, isAdmin } = useAuth();
   const [subjects, setSubjects] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('all');
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Vistas: 'month', 'week', 'day'
-  const [currentView, setCurrentView] = useState('month');
-  const [currentDate, setCurrentDate] = useState(new Date());
+  // Vista mensual activa
+  const currentView = 'month';
+  const [currentDate, setCurrentDate] = useState(() => new Date());
 
   useEffect(() => {
     const loadEvents = async () => {
       setLoading(true);
       try {
         let subs = [];
-        if (isAdmin || isGuest) {
+        if (!isAuthenticated || isAdmin || isGuest) {
           subs = await subjectService.getSubjects();
         } else if (isTeacher) {
           subs = await subjectService.getTeacherSubjects(user?.id);
@@ -64,7 +60,7 @@ export const CalendarPage = () => {
     };
 
     loadEvents();
-  }, [user, isTeacher, isGuest, isAdmin]);
+  }, [user, isAuthenticated, isTeacher, isGuest, isAdmin]);
 
   const nextPeriod = () => {
     const next = new Date(currentDate);
@@ -110,7 +106,7 @@ export const CalendarPage = () => {
           </p>
         </div>
 
-        {subjects.length > 0 && !isGuest && (
+        {subjects.length > 0 && isAuthenticated && !isGuest && (
           <select
             className="form-select"
             style={{ width: 'auto' }}
@@ -196,7 +192,7 @@ export const CalendarPage = () => {
                   )}
                 </div>
 
-                {!isGuest && (
+                {isAuthenticated && !isGuest && (
                   <Link to={ev.link} className="btn btn-secondary btn-sm">
                     Ver Clase
                   </Link>

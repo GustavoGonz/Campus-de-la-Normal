@@ -1,8 +1,8 @@
 # Campus: La Normal
 > **Eslogan:** *«Aprender mejor, juntos»*  
-> **Institución:** Escuela Normal Dr. Pedro Ignacio de Castro Barros — La Rioja, Argentina.
+> **Institución:** Escuela Normal Superior Dr. Pedro Ignacio de Castro Barros — La Rioja, Argentina.
 
-Plataforma educativa institucional estructurada como una **biblioteca digital de archivos PDF por materia**, planificación de clases, calendario escolar y tutor pedagógico inteligente para la comunidad educativa de la Escuela Normal.
+Plataforma educativa institucional centrada en el **Tutor IA Pedagógico con sistema RAG**, acompañada de la **biblioteca digital de archivos PDF por materia**, planificación de clases, calendario escolar y gestión por roles para la comunidad educativa de la Escuela Normal.
 
 ---
 
@@ -10,148 +10,124 @@ Plataforma educativa institucional estructurada como una **biblioteca digital de
 
 El proyecto está construido bajo una **arquitectura modular y escalable** con separación estricta entre capa visual, lógica de negocio, control de acceso y persistencia:
 
-- **Frontend & UI:** React (JavaScript ES6+ / JSX) sobre **Vite** para desarrollo y empaquetado ágil.
-- **Sistema de Diseño:** CSS3 puro con tokens institucionales inspirados en los colores oficiales de la Escuela Normal (Azul Real `#0C13A8`, Naranja Institucional `#FF7B15`, Blanco y Dorado), tipografías *Plus Jakarta Sans* y *Outfit*, componentes accesibles, tarjetas interactivas y diseño responsivo para móviles, tablets y computadoras.
-- **Iconografía:** Lucide React.
-- **Navegación:** React Router con verificación de roles en rutas protegidas (`ProtectedRoute`).
-- **Persistencia & Backend:** Supabase (PostgreSQL, Supabase Auth y Supabase Storage para los documentos PDF).
-- **Pruebas Automatizadas:** Vitest con pruebas completas de los flujos de biblioteca, roles y autenticación.
+- **Frontend & UI:** React (JavaScript ES6+ / JSX) sobre **Vite**.
+- **Sistema de Diseño:** CSS3 puro con tokens institucionales inspirados en los colores oficiales de la Escuela Normal (Azul Real `#0C13A8`, Naranja Institucional `#FF7B15`, Blanco y Dorado), tipografías *Plus Jakarta Sans* y *Outfit*, diseño responsivo para móviles, tablets y computadoras.
+- **Tutor IA Unificado + Motor RAG:** Un único componente `AITutorPage` y un único servicio `aiService` + `ragEngine` compartidos entre la página pública de inicio y el campus autenticado.
+- **Navegación:** React Router con verificación de roles en rutas protegidas (`ProtectedRoute`) y soporte SPA en producción (`vercel.json`).
+- **Persistencia & Backend:** Supabase (PostgreSQL con políticas RLS completas, Supabase Auth por correo y contraseña, y Supabase Storage para documentos PDF).
+- **Pruebas Automatizadas:** Vitest con suite integral de validación de Tutor IA, autenticación, redirecciones de producción y accesos rápidos por rol.
 
 ---
 
-## 👥 2. Los Cuatro Roles Institucionales y sus Permisos
+## 👥 2. Los Cuatro Roles Institucionales y Accesos Rápidos
 
-La plataforma cuenta con **cuatro roles oficiales** organizados en orden estricto de visualización y administración:
+La plataforma cuenta con **cuatro roles oficiales** organizados en orden estricto de visualización y administración, con **Accesos Rápidos** disponibles para validación inmediata:
 
 1. **Estudiante (`student`):**
-   - Acceder a las materias en las que se encuentra inscripto.
-   - Consultar la biblioteca digital de sus materias.
-   - Abrir y descargar los documentos en formato PDF disponibles.
-   - Consultar clases planificadas y calendario escolar.
+   - Consultar el **Tutor IA unificado** sobre sus materias y materiales autorizados.
+   - Acceder a las materias en las que se encuentra inscripto y a su biblioteca digital de archivos PDF.
+   - Consultar clases planificadas, materias previas y calendario escolar.
    - No puede subir, modificar ni eliminar archivos de la biblioteca.
 
 2. **Docente (`teacher`):**
-   - Acceder a sus materias asignadas.
-   - Administrar la biblioteca digital de archivos PDF de sus materias.
-   - Subir nuevos archivos PDF con título, descripción pedagógica y unidad/tema.
-   - Reemplazar o actualizar sus propios archivos PDF incrementando la versión del material.
-   - Eliminar sus propios archivos, removiéndolos de la base de datos y de Supabase Storage.
-   - Organizar el material por carpetas y unidades temáticas.
-   - Planificar clases y vincular los documentos PDF de la biblioteca.
-   - Revisar y aprobar o rechazar solicitudes de matriculación de estudiantes.
+   - Consultar el **Tutor IA unificado** como asistente pedagógico.
+   - Administrar la biblioteca digital de archivos PDF de sus materias (subir, reemplazar versionando y eliminar archivos propios).
+   - Planificar clases y revisar solicitudes de matriculación de estudiantes.
 
 3. **Administrador (`admin`):**
-   - Administrar usuarios y sus estados (activo/suspendido).
-   - Asignar y modificar los cuatro roles institucionales (Estudiante, Docente, Administrador, Invitado).
+   - Administrar usuarios, activar/suspender cuentas y asignar los cuatro roles institucionales.
    - Crear y gestionar cursos, divisiones, turnos y materias.
-   - Tener acceso irrestricto a las funciones administrativas de la plataforma.
+   - Acceder al **Tutor IA unificado** y al control general del campus.
 
 4. **Invitado (`guest`):**
-   - Acceso limitado a la aplicación y a las secciones públicas autorizadas.
-   - Visualizar la propuesta formativa, los cursos institucionales y el calendario escolar.
-   - No puede ingresar a materias privadas ni acceder a archivos PDF restringidos.
-   - No puede modificar información ni administrar usuarios.
-
-> **Seguridad y Control de Roles:** Los usuarios no pueden convertirse por sí mismos en docentes o administradores. La asignación de roles privilegiados está controlada por el administrador y protegida a nivel de base de datos con políticas de seguridad RLS en PostgreSQL.
+   - Acceso acotado a espacios públicos autorizados y al **Tutor IA** (restringido exclusivamente a fuentes públicas autorizadas).
+   - Visualizar la oferta curricular, los cursos institucionales y el calendario escolar.
+   - Sin acceso a aulas privadas, materias previas ni archivos PDF restringidos.
 
 ---
 
-## 📚 3. Biblioteca Digital de Archivos PDF por Materia
+## 🔐 3. Autenticación Institucional y Configuración de Redirecciones en Producción
 
-La plataforma funciona como una **biblioteca digital de materiales educativos** en formato PDF:
+El inicio de sesión y registro utiliza **exclusivamente Correo electrónico y Contraseña** a través de Supabase Auth (sin proveedores OAuth sociales):
 
-- **Sin sistema de actividades ni entrega de tareas:** Se eliminó completamente la creación y corrección de actividades, entrega de tareas, calificaciones e historial de entregas.
-- **Almacenamiento Seguro en Supabase Storage:** Todos los documentos se guardan en el bucket `course-materials`, relacionados con su materia respectiva.
-- **Validación Estricta:** Se valida el formato exclusivamente en **PDF** (`.pdf` / `application/pdf`) y un tamaño máximo de 50 MB por archivo.
-- **Persistencia Real:** Los archivos se conservan permanentemente y continúan disponibles tras cerrar sesión y volver a ingresar.
-- **Mensaje de Estado:** Si una materia no posee archivos cargados aún, se muestra el mensaje institucional: *«Todavía no hay material disponible para esta materia»*.
+- **Inicio de sesión y registro:** Normalización de correo electrónico (`trim().toLowerCase()`) y mensajes claros en español.
+- **Confirmación de correo electrónico (`/auth/callback`):** Al registrarse, `signUp` envía `emailRedirectTo: 'https://campus-de-la-normal.vercel.app/auth/callback'`. La ruta `AuthCallbackPage` valida automáticamente el token (`token_hash` / PKCE `code`), crea la sesión activa y redirige al usuario autenticado a `/panel`.
+- **Recuperación de contraseña (`/reset-password`):** Envía el enlace al dominio oficial de producción (`https://campus-de-la-normal.vercel.app/reset-password`) y valida el token antes de actualizar la clave.
 
----
-
-## 🔐 4. Inicio de Sesión con Gmail y Supabase Authentication
-
-La aplicación implementa inicio de sesión real mediante dos modalidades complementarias:
-
-### A. Correo Electrónico (Gmail) y Contraseña
-- Admite cualquier cuenta de Gmail (`usuario@gmail.com`) o correo institucional.
-- Los correos se normalizan en minúsculas y sin espacios (`trim().toLowerCase()`).
-- Mensajes de error claros y en español para credenciales incorrectas, correo no confirmado, usuario no registrado o límite de intentos.
-- Persistencia de sesión automática mediante `localStorage` y `onAuthStateChange`.
-- Recuperación de contraseñas mediante correo con enlace directo a la página `/reset-password` para ingresar la nueva clave.
-
-### B. Inicio de Sesión Directo con Google OAuth (Gmail)
-- Botón **«Continuar con Google (Gmail)»** en la pantalla de inicio de sesión.
-- Utiliza `supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: ... } })`.
-- Captura la sesión al regresar y crea automáticamente el perfil con rol de **Estudiante** (o Invitado) si es el primer ingreso del usuario.
-
-> **Configuración en el Dashboard de Supabase:**
-> 1. Ir a **Authentication** > **Providers** > **Google**.
-> 2. Habilitar el proveedor ingresando el *Client ID* y *Client Secret* de Google Cloud Console.
-> 3. En **URL Configuration**, agregar la URL del sitio (ej. `http://localhost:5173` o dominio de producción) en **Site URL** y **Redirect URLs**.
+> **Configuración obligatoria en el Dashboard de Supabase (`Authentication` → `URL Configuration`):**
+> - **Site URL:** `https://campus-de-la-normal.vercel.app`
+> - **Redirect URLs:**
+>   - `https://campus-de-la-normal.vercel.app/**`
+>   - `https://campus-de-la-normal.vercel.app/auth/callback`
+>   - `https://campus-de-la-normal.vercel.app/reset-password`
 
 ---
 
-## 📁 5. Estructura del Código
+## 📁 4. Estructura del Código
 
 ```
 Campus-de-la-Normal/
-├── public/                 # Recursos públicos y favicon institucional
+├── public/                 # Recursos públicos e identidad institucional
 ├── src/
-│   ├── config/             # Cliente de conexión con Supabase
-│   │   └── supabaseClient.js
-│   ├── context/            # Contexto de Autenticación y Notificaciones
-│   │   ├── AuthContext.jsx
+│   ├── config/
+│   │   └── supabaseClient.js         # Cliente Supabase y URL oficial de producción (getSiteUrl)
+│   ├── context/
+│   │   ├── AuthContext.jsx           # Autenticación email/password, callbacks y accesos rápidos por rol
 │   │   └── NotificationContext.jsx
-│   ├── services/           # Lógica de negocio y servicios
-│   │   ├── subjectService.js         # Materias, cursos y solicitudes
+│   ├── services/
+│   │   ├── ragEngine.js              # Motor RAG institucional con citas verificables
+│   │   ├── aiService.js              # Servicio único del Tutor IA (público y autenticado)
+│   │   ├── subjectService.js         # Materias, cursos y solicitudes de acceso
 │   │   ├── materialService.js        # Biblioteca Digital de archivos PDF
 │   │   ├── classService.js           # Clases y cronograma docente
-│   │   ├── aiService.js              # Tutor IA pedagógico por materia
 │   │   ├── previousSubjectsService.js# Materias previas y checklist de unidades
-│   │   ├── adminService.js           # Gestión de usuarios y roles
-│   │   └── storageService.js         # Validación y subida a Supabase Storage
+│   │   ├── adminService.js           # Gestión de usuarios y 4 roles
+│   │   └── storageService.js         # Validación PDF y subida a Supabase Storage
+│   ├── data/
+│   │   └── institutionalKnowledgeBase.js # Corpus oficial indexado (Planificaciones y Cuadernillos)
 │   ├── components/
-│   │   ├── auth/           # Rutas protegidas por rol
-│   │   ├── common/         # Navbar, Sidebar, Modales, Spinner, Buscador
-│   │   └── layout/         # Shell principal adaptable
+│   │   ├── auth/ProtectedRoute.jsx   # Protección de rutas y permisos por rol
+│   │   ├── common/                   # Navbar, Sidebar, Modales, Spinner, Buscador
+│   │   └── layout/AppLayout.jsx      # Shell principal adaptable
 │   ├── pages/
-│   │   ├── public/         # Inicio institucional y Restablecer contraseña
-│   │   │   ├── LandingPage.jsx
-│   │   │   └── ResetPasswordPage.jsx
-│   │   ├── dashboard/      # Enrutador según rol (DashboardRouter)
-│   │   ├── guest/          # Panel exclusivo del rol Invitado (GuestDashboard)
-│   │   ├── teacher/        # Aula docente, Biblioteca de PDF, Clases
-│   │   ├── student/        # Aula estudiantil, Biblioteca de lectura
-│   │   ├── ai/             # Tutor Inteligente IA
-│   │   ├── previousSubjects/# Preparación de materias previas
-│   │   ├── calendar/       # Calendario escolar interactivo
-│   │   ├── admin/          # Panel administrativo de usuarios y 4 roles
-│   │   └── profile/        # Perfil y datos del usuario
-│   ├── tests/              # Pruebas obligatorias de validación
-│   │   └── campus.test.js
-│   ├── App.jsx             # Árbol de rutas principal
-│   ├── index.css           # Tokens de diseño e identidad institucional
+│   │   ├── public/                   # LandingPage, AuthCallbackPage, ResetPasswordPage
+│   │   ├── ai/AITutorPage.jsx        # Único componente del Tutor IA en toda la plataforma
+│   │   ├── dashboard/DashboardRouter.jsx # Enrutamiento por rol en /panel
+│   │   ├── student/                  # Panel estudiantil y biblioteca de lectura
+│   │   ├── teacher/                  # Panel docente y gestión de biblioteca PDF
+│   │   ├── guest/                    # Panel exclusivo del rol Invitado
+│   │   ├── admin/                    # Panel administrativo de usuarios, materias y cursos
+│   │   ├── previousSubjects/         # Preparación de materias previas
+│   │   ├── calendar/                 # Calendario escolar interactivo
+│   │   └── profile/                  # Perfil y datos del usuario
+│   ├── tests/
+│   │   └── campus.test.js            # Pruebas automatizadas integrales
+│   ├── App.jsx                       # Árbol de rutas principal
+│   ├── index.css                     # Tokens de diseño e identidad institucional
 │   └── main.jsx
 ├── supabase/
-│   ├── schema.sql          # Script completo de Base de Datos y Políticas RLS
-│   ├── migration_roles_and_library.sql # Migración incremental para Supabase
-│   └── setup_admin.sql     # Procedimiento para designar administrador
-├── .env                    # Variables de entorno conectadas a Supabase
-├── .env.example            # Plantilla de variables de entorno
+│   ├── schema.sql                    # Esquema completo PostgreSQL y políticas RLS
+│   ├── migration_roles_and_library.sql
+│   └── setup_admin.sql
+├── vercel.json                       # Reglas de reescritura SPA para rutas en producción
+├── .env.example                      # Plantilla de variables de entorno
 └── package.json
 ```
 
 ---
 
-## ⚙️ 6. Configuración y Despliegue
+## ⚙️ 5. Variables de Entorno y Comandos
 
 ### Variables de Entorno (`.env`)
 ```env
 VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
 VITE_SUPABASE_ANON_KEY=tu-clave-anon-publica
+VITE_SITE_URL=https://campus-de-la-normal.vercel.app
 ```
 
-### Ejecución de Pruebas:
+### Comandos de Verificación:
 ```bash
+npm run lint
 npm test
+npm run build
 ```

@@ -4,17 +4,15 @@ import { useAuth } from '../../context/AuthContext';
 import { subjectService } from '../../services/subjectService';
 import { 
   UserCheck, 
-  BookOpen, 
   Calendar, 
   ShieldAlert, 
   Info, 
   Lock, 
-  ArrowRight,
-  Sparkles,
-  ExternalLink
+  Sparkles
 } from 'lucide-react';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { InstitutionalLogo } from '../../components/common/InstitutionalLogo';
+import { AITutorPage } from '../ai/AITutorPage';
 
 export const GuestDashboard = () => {
   const { profile } = useAuth();
@@ -94,8 +92,15 @@ export const GuestDashboard = () => {
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
-            onClick={() => navigate('/calendario')}
+            onClick={() => navigate('/tutor-ia')}
             className="btn btn-accent"
+          >
+            <Sparkles size={16} /> Tutor IA Público
+          </button>
+          <button
+            onClick={() => navigate('/calendario')}
+            className="btn"
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#ffffff', backdropFilter: 'blur(4px)' }}
           >
             <Calendar size={16} /> Ver Calendario Escolar
           </button>
@@ -110,10 +115,15 @@ export const GuestDashboard = () => {
             Acceso Limitado a Espacios Públicos
           </div>
           <div style={{ fontSize: '0.875rem', lineHeight: 1.5 }}>
-            Tu cuenta posee el <strong>Rol de Invitado</strong>. Por políticas de seguridad institucional, las aulas virtuales, los documentos privados y las bibliotecas digitales están restringidas exclusivamente a los estudiantes matriculados y docentes autorizados. Si sos alumno o docente de la Escuela Normal, comunicate con la administración para asignar tu rol correspondiente.
+            Tu cuenta posee el <strong>Rol de Invitado</strong>. Por políticas de seguridad institucional, las aulas virtuales, los documentos privados y las bibliotecas digitales están restringidas exclusivamente a los estudiantes matriculados y docentes autorizados. Podés realizar consultas académicas sobre materiales públicos autorizados mediante el Tutor IA a continuación.
           </div>
         </div>
       </div>
+
+      {/* Tutor IA Unificado Integrado para Rol Invitado (Fuentes Públicas Autorizadas) */}
+      <section style={{ marginBottom: '2.5rem' }} aria-label="Tutor IA Público para Invitados">
+        <AITutorPage embedded={true} fullWidth={true} />
+      </section>
 
       {/* Resumen de Cursos y Oferta Curricular */}
       <div style={{ marginBottom: '2.5rem' }}>
@@ -204,6 +214,16 @@ export const GuestDashboard = () => {
 
       {/* Accesos Disponibles para el Invitado */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+        <Link to="/tutor-ia" className="card card-interactive" style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none' }}>
+          <div style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--brand-orange-light)', color: 'var(--brand-orange)' }}>
+            <Sparkles size={24} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-900)' }}>Tutor IA Institucional</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Consultá sobre planificaciones públicas</div>
+          </div>
+        </Link>
+
         <Link to="/calendario" className="card card-interactive" style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none' }}>
           <div style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--success-50)', color: 'var(--success-600)' }}>
             <Calendar size={24} />

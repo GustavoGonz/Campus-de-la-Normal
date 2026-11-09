@@ -33,9 +33,13 @@ export const SearchModal = ({ isOpen, onClose }) => {
         const found = [];
 
         // 1. Buscar en materias
-        const subjects = isTeacher
-          ? await subjectService.getTeacherSubjects(user?.id)
-          : await subjectService.getStudentSubjects(user?.id);
+        const subjects = isAdmin
+          ? await subjectService.getSubjects()
+          : isTeacher
+            ? await subjectService.getTeacherSubjects(user?.id)
+            : await subjectService.getStudentSubjects(user?.id);
+
+        const canManage = isTeacher || isAdmin;
 
         subjects.forEach((s) => {
           if (s.name.toLowerCase().includes(terms) || (s.code && s.code.toLowerCase().includes(terms))) {
@@ -44,7 +48,7 @@ export const SearchModal = ({ isOpen, onClose }) => {
               type: 'subject',
               title: s.name,
               subtitle: `Materia • Código: ${s.code || 'N/A'} • ${s.courses?.name || ''}`,
-              link: isTeacher ? `/profesor/materia/${s.id}` : `/estudiante/materia/${s.id}`,
+              link: canManage ? `/profesor/materia/${s.id}` : `/estudiante/materia/${s.id}`,
             });
           }
         });
@@ -52,7 +56,7 @@ export const SearchModal = ({ isOpen, onClose }) => {
         // 2. Buscar en documentos PDF y clases de las materias
         for (const s of subjects.slice(0, 6)) {
           // Documentos PDF
-          const mats = await materialService.getMaterials(s.id, !isTeacher && !isAdmin);
+          const mats = await materialService.getMaterials(s.id, !canManage);
           mats.forEach((m) => {
             if (m.title.toLowerCase().includes(terms) || (m.description && m.description.toLowerCase().includes(terms))) {
               found.push({
@@ -60,13 +64,13 @@ export const SearchModal = ({ isOpen, onClose }) => {
                 type: 'material',
                 title: m.title,
                 subtitle: `Documento PDF en ${s.name} • ${m.file_name}`,
-                link: isTeacher ? `/profesor/materia/${s.id}` : `/estudiante/materia/${s.id}`,
+                link: canManage ? `/profesor/materia/${s.id}` : `/estudiante/materia/${s.id}`,
               });
             }
           });
 
           // Clases
-          const classes = await classService.getClasses(s.id, !isTeacher && !isAdmin);
+          const classes = await classService.getClasses(s.id, !canManage);
           classes.forEach((c) => {
             if (c.title.toLowerCase().includes(terms) || (c.content && c.content.toLowerCase().includes(terms))) {
               found.push({
@@ -74,7 +78,7 @@ export const SearchModal = ({ isOpen, onClose }) => {
                 type: 'class',
                 title: c.title,
                 subtitle: `Clase del ${c.class_date} en ${s.name}`,
-                link: isTeacher ? `/profesor/materia/${s.id}` : `/estudiante/materia/${s.id}`,
+                link: canManage ? `/profesor/materia/${s.id}` : `/estudiante/materia/${s.id}`,
               });
             }
           });

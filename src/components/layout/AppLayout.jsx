@@ -9,10 +9,7 @@ export const AppLayout = () => {
   return (
     <div className="app-container">
       {/* Sidebar - responsive desktop visible, mobile toggle */}
-      <div style={{
-        display: sidebarOpen ? 'block' : 'none',
-        '@media (min-width: 1024px)': { display: 'block' },
-      }} className="sidebar-wrapper">
+      <div className={`sidebar-wrapper ${sidebarOpen ? 'is-open' : ''}`}>
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
@@ -26,22 +23,6 @@ export const AppLayout = () => {
           <Outlet />
         </main>
       </div>
-
-      <style>{`
-        @media (max-width: 1023px) {
-          .sidebar-wrapper {
-            position: fixed;
-            inset: 0;
-            z-index: 50;
-            width: 260px;
-          }
-        }
-        @media (min-width: 1024px) {
-          .sidebar-wrapper {
-            display: block !important;
-          }
-        }
-      `}</style>
     </div>
   );
 };

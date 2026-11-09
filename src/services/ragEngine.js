@@ -414,7 +414,17 @@ export class RAGEngine {
     else if (text.includes('matemática') || text.includes('matematica') || text.includes('entero') || text.includes('ecuacion')) detectedSubject = 'Matemática I';
     else if (text.includes('ética') || text.includes('etica') || text.includes('norma') || text.includes('ciudadan')) detectedSubject = 'Formación Ética y Ciudadana';
     else if (text.includes('tecnolog') || text.includes('técnica') || text.includes('bienes')) detectedSubject = 'Educación Tecnológica';
-    else if (text.includes('química') || text.includes('quimica') || text.includes('física') || text.includes('fisica') || text.includes('materia') || text.includes('estado')) detectedSubject = 'Física y Química';
+    else if (
+      text.includes('química') ||
+      text.includes('quimica') ||
+      text.includes('física') ||
+      text.includes('fisica') ||
+      text.includes('agregación') ||
+      text.includes('agregacion') ||
+      text.includes('sistemas materiales') ||
+      text.includes('densidad') ||
+      text.includes('ebullición')
+    ) detectedSubject = 'Física y Química';
 
     // Detección de Curso / Año
     let detectedCourse = null;
@@ -450,33 +460,37 @@ export class RAGEngine {
   searchRelevantChunks(prompt, options = {}) {
     const {
       isPublic = false,
-      userRole = 'guest',
-      subjectId = null,
       subjectName = null,
     } = options;
 
     const analysis = this.analyzeUserQuery(prompt);
-    const targetSubject = subjectName || analysis.detectedSubject;
+    // Si la consulta menciona explícitamente una materia, priorizar esa detección;
+    // de lo contrario usar el filtro de materia activa si fue elegido.
+    const targetSubject = analysis.detectedSubject || subjectName;
 
     const queryWords = prompt
       .toLowerCase()
-      .replace(/[¿?¡!.,:;()\[\]]/g, ' ')
+      .replace(/[¿?¡!.,:;()[\]]/g, ' ')
       .split(/\s+/)
       .filter((w) => w.length > 2);
 
-    let candidates = this.memoryChunks.filter((chunk) => {
-      // 1. Filtro de privacidad: Si la consulta es pública / invitada, solo fragmentos públicos
-      if (isPublic && !chunk.isPublic) {
-        return false;
-      }
+    const filterByPrivacy = (chunk) => !(isPublic && !chunk.isPublic);
 
-      // 2. Filtro de materia si está especificada en el contexto de navegación
+    let candidates = this.memoryChunks.filter((chunk) => {
+      if (!filterByPrivacy(chunk)) return false;
+
       if (targetSubject && !chunk.subject.toLowerCase().includes(targetSubject.toLowerCase())) {
         return false;
       }
 
       return true;
     });
+
+    // Si el filtro de materia activa dejó sin candidatos pero hay documentos en otra materia autorizada,
+    // ampliar la búsqueda respetando estrictamente la privacidad del rol.
+    if (candidates.length === 0 && targetSubject) {
+      candidates = this.memoryChunks.filter(filterByPrivacy);
+    }
 
     // Ponderación de relevancia
     const scored = candidates.map((chunk) => {
@@ -523,7 +537,7 @@ export class RAGEngine {
 
     const queryWords = prompt
       .toLowerCase()
-      .replace(/[¿?¡!.,:;()\[\]]/g, ' ')
+      .replace(/[¿?¡!.,:;()[\]]/g, ' ')
       .split(/\s+/)
       .filter((w) => w.length > 2);
 
@@ -595,7 +609,7 @@ Para preservar la precisión pedagógica y no presentar conjeturas como hechos i
   }
 
   // Respuesta específica y estructurada para la Segunda Unidad de Antropología
-  formatAntropologiaUnidad2Answer(sources, analysis) {
+  formatAntropologiaUnidad2Answer(sources) {
     const responseText = `### Explicación Pedagógica: Segunda Unidad de Antropología
 **Escuela Normal Superior Dr. Pedro Ignacio de Castro Barros • 5° Año (Divisiones “B” y “F”)**
 
@@ -686,7 +700,7 @@ En el cuadernillo de actividades, las docentes solicitan:
   }
 
   // Formateador genérico con correlación Planificación - Cuadernillo
-  formatGenericGroundedAnswer(prompt, cuadernillo, planif, sources, analysis) {
+  formatGenericGroundedAnswer(prompt, cuadernillo, planif, sources) {
     const subjectTitle = cuadernillo.subject || (planif ? planif.subject : 'Materia Institucional');
     const unitTitle = cuadernillo.unitTitle || (planif ? planif.unitTitle : 'Unidad Curricular');
 

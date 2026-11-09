@@ -9,17 +9,24 @@ import {
   Sparkles,
   BookmarkCheck,
   Users,
-  X,
-  UserCheck
+  GraduationCap,
+  Home,
+  X
 } from 'lucide-react';
 import { InstitutionalLogo } from './InstitutionalLogo';
 
 export const Sidebar = ({ isOpen, onClose }) => {
-  const { role, isAdmin, isTeacher, isGuest, isStudent } = useAuth();
+  const { isAuthenticated, isAdmin, isTeacher, isGuest } = useAuth();
+
+  const publicLinks = [
+    { to: '/', label: 'Página de Inicio', icon: Home },
+    { to: '/tutor-ia', label: 'Tutor IA Institucional', icon: Sparkles },
+    { to: '/calendario', label: 'Calendario Escolar', icon: Calendar },
+  ];
 
   const teacherLinks = [
-    { to: '/panel', label: 'Inicio (Tutor IA)', icon: LayoutDashboard },
-    { to: '/tutor-ia', label: 'Tutor Pedagógico', icon: Sparkles },
+    { to: '/panel', label: 'Panel Docente', icon: LayoutDashboard },
+    { to: '/tutor-ia', label: 'Tutor Pedagógico IA', icon: Sparkles },
     { to: '/profesor/biblioteca', label: 'Biblioteca Digital', icon: FolderArchive },
     { to: '/profesor/materias', label: 'Mis Cátedras', icon: BookOpen },
     { to: '/profesor/clases', label: 'Clases y Cronograma', icon: Calendar },
@@ -28,8 +35,8 @@ export const Sidebar = ({ isOpen, onClose }) => {
   ];
 
   const studentLinks = [
-    { to: '/panel', label: 'Inicio (Tutor IA)', icon: LayoutDashboard },
-    { to: '/tutor-ia', label: 'Tutor Pedagógico', icon: Sparkles },
+    { to: '/panel', label: 'Espacio Estudiantil', icon: LayoutDashboard },
+    { to: '/tutor-ia', label: 'Tutor Pedagógico IA', icon: Sparkles },
     { to: '/estudiante/biblioteca', label: 'Biblioteca Digital', icon: FolderArchive },
     { to: '/estudiante/materias', label: 'Mis Materias', icon: BookOpen },
     { to: '/materias-previas', label: 'Materias Previas', icon: BookmarkCheck },
@@ -37,35 +44,39 @@ export const Sidebar = ({ isOpen, onClose }) => {
   ];
 
   const adminLinks = [
-    { to: '/panel', label: 'Inicio (Tutor IA)', icon: LayoutDashboard },
-    { to: '/tutor-ia', label: 'Tutor Pedagógico', icon: Sparkles },
+    { to: '/panel', label: 'Panel Central', icon: LayoutDashboard },
+    { to: '/tutor-ia', label: 'Tutor Pedagógico IA', icon: Sparkles },
     { to: '/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
-    { to: '/admin/materias', label: 'Materias y Cursos', icon: BookOpen },
+    { to: '/admin/materias', label: 'Materias y Espacios', icon: BookOpen },
+    { to: '/admin/cursos', label: 'Cursos y Divisiones', icon: GraduationCap },
     { to: '/profesor/biblioteca', label: 'Control de Biblioteca', icon: FolderArchive },
-    { to: '/materias-previas', label: 'Materias Previas', icon: BookmarkCheck },
     { to: '/calendario', label: 'Calendario Escolar', icon: Calendar },
   ];
 
   const guestLinks = [
-    { to: '/panel', label: 'Inicio (Tutor IA)', icon: LayoutDashboard },
+    { to: '/panel', label: 'Panel de Invitado', icon: LayoutDashboard },
     { to: '/tutor-ia', label: 'Tutor IA Público', icon: Sparkles },
     { to: '/calendario', label: 'Calendario Escolar', icon: Calendar },
   ];
 
-  const links = isAdmin 
-    ? adminLinks 
-    : isTeacher 
-    ? teacherLinks 
-    : isGuest 
-    ? guestLinks 
+  const links = !isAuthenticated
+    ? publicLinks
+    : isAdmin
+    ? adminLinks
+    : isTeacher
+    ? teacherLinks
+    : isGuest
+    ? guestLinks
     : studentLinks;
 
-  const roleText = isAdmin 
-    ? 'Administrativa' 
-    : isTeacher 
-    ? 'Docente' 
-    : isGuest 
-    ? 'Invitado' 
+  const roleText = !isAuthenticated
+    ? 'Pública'
+    : isAdmin
+    ? 'Administrativa'
+    : isTeacher
+    ? 'Docente'
+    : isGuest
+    ? 'Invitado'
     : 'Estudiantil';
 
   return (
@@ -114,10 +125,10 @@ export const Sidebar = ({ isOpen, onClose }) => {
             variant="horizontal"
             size="sm"
             showSlogan={false}
-            to="/panel"
+            to={isAuthenticated ? '/panel' : '/'}
           />
-          {onClose && (
-            <button onClick={onClose} className="btn btn-ghost btn-sm" style={{ padding: '0.2rem' }}>
+          {onClose && isOpen && (
+            <button onClick={onClose} className="btn btn-ghost btn-sm" style={{ padding: '0.2rem' }} aria-label="Cerrar menú">
               <X size={18} />
             </button>
           )}
@@ -143,6 +154,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
                 <li key={item.to}>
                   <NavLink
                     to={item.to}
+                    end={item.to === '/'}
                     onClick={() => {
                       if (window.innerWidth < 1024 && onClose) onClose();
                     }}

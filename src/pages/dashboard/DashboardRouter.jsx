@@ -1,8 +1,24 @@
 import React from 'react';
-import { MainCampusHome } from './MainCampusHome';
+import { useAuth } from '../../context/AuthContext';
+import { StudentDashboard } from '../student/StudentDashboard';
+import { TeacherDashboard } from '../teacher/TeacherDashboard';
+import { AdminPanel } from '../admin/AdminPanel';
+import { GuestDashboard } from '../guest/GuestDashboard';
 
 export const DashboardRouter = () => {
-  // La pantalla de inicio de la plataforma otorga el rol protagónico y central al Tutor IA,
-  // adaptando las herramientas complementarias (biblioteca, materias, administración) según el rol del usuario.
-  return <MainCampusHome />;
+  const { isAdmin, isTeacher, isGuest } = useAuth();
+
+  if (isAdmin) {
+    return <AdminPanel />;
+  }
+
+  if (isTeacher) {
+    return <TeacherDashboard />;
+  }
+
+  if (isGuest) {
+    return <GuestDashboard />;
+  }
+
+  return <StudentDashboard />;
 };

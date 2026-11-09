@@ -5,8 +5,9 @@ import { NotificationProvider } from './context/NotificationContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 
-// Páginas Públicas
+// Páginas Públicas y Callbacks de Autenticación
 import { LandingPage } from './pages/public/LandingPage';
+import { AuthCallbackPage } from './pages/public/AuthCallbackPage';
 import { ResetPasswordPage } from './pages/public/ResetPasswordPage';
 
 // Enrutador de Dashboard y Roles
@@ -34,20 +35,46 @@ export function App() {
       <NotificationProvider>
         <BrowserRouter>
           <Routes>
-            {/* Rutas Públicas */}
+            {/* Rutas Públicas y Validación de Correo / Contraseña */}
             <Route path="/" element={<LandingPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-            {/* Rutas Protegidas del Campus */}
-            <Route
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
+            {/* Shell del Campus (soporta vistas públicas compartidas y rutas protegidas por rol) */}
+            <Route element={<AppLayout />}>
+              {/* Módulos de acceso tanto público como autenticado */}
+              <Route path="/tutor-ia" element={<AITutorPage />} />
+              <Route path="/calendario" element={<CalendarPage />} />
+
               {/* Panel adaptable según el rol (Estudiante, Docente, Administrador, Invitado) */}
-              <Route path="/panel" element={<DashboardRouter />} />
+              <Route
+                path="/panel"
+                element={
+                  <ProtectedRoute>
+                    <DashboardRouter />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Perfil del usuario autenticado */}
+              <Route
+                path="/perfil"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Materias Previas (exclusivo para estudiantes, docentes y administradores; restringido a invitados) */}
+              <Route
+                path="/materias-previas"
+                element={
+                  <ProtectedRoute allowedRoles={['student', 'teacher', 'admin']}>
+                    <PreviousSubjectsPage />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Rutas Docentes */}
               <Route
@@ -108,12 +135,6 @@ export function App() {
                   </ProtectedRoute>
                 }
               />
-
-              {/* Módulos Compartidos */}
-              <Route path="/tutor-ia" element={<AITutorPage />} />
-              <Route path="/materias-previas" element={<PreviousSubjectsPage />} />
-              <Route path="/calendario" element={<CalendarPage />} />
-              <Route path="/perfil" element={<ProfilePage />} />
 
               {/* Panel de Administración */}
               <Route

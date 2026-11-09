@@ -35,36 +35,38 @@
   --primary-950: #040742;
   --primary-900: #080e7d;
   --primary-850: #0a1188;
-  --primary-800: #0c13a8; /* Main Normal Blue */
+  --primary-800: #0c13a8;
+  /* Main Normal Blue */
   --primary-700: #1720cc;
   --primary-600: #2533e8;
   --primary-500: #3b82f6;
   --primary-200: #c7d2fe;
   --primary-100: #e0e7ff;
-  --primary-50:  #eef2ff;
+  --primary-50: #eef2ff;
 
   --accent-700: #c25203;
   --accent-600: #e66807;
-  --accent-500: #ff7b15; /* Main Normal Orange */
+  --accent-500: #ff7b15;
+  /* Main Normal Orange */
   --accent-200: #fed7aa;
   --accent-100: #ffedd5;
-  --accent-50:  #fff7ed;
+  --accent-50: #fff7ed;
 
   --amber-600: #b45309;
   --amber-500: #d97706;
   --amber-400: #e3cb15;
   --amber-100: #fef3c7;
-  --amber-50:  #fffbeb;
+  --amber-50: #fffbeb;
 
   --success-600: #059669;
   --success-500: #10b981;
   --success-100: #d1fae5;
-  --success-50:  #ecfdf5;
+  --success-50: #ecfdf5;
 
   --danger-600: #dc2626;
   --danger-500: #ef4444;
   --danger-100: #fee2e2;
-  --danger-50:  #fef2f2;
+  --danger-50: #fef2f2;
 
   /* Surfaces & Neutrals */
   --bg-page: #f8fafc;
@@ -107,13 +109,16 @@
 }
 
 /* Light / System Reset */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
+html,
+body {
   min-height: 100%;
   font-family: var(--font-main);
   background-color: var(--bg-page);
@@ -131,7 +136,12 @@ html, body {
 }
 
 /* Typography Helpers */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-display);
   color: var(--primary-900);
   font-weight: 700;
@@ -295,11 +305,30 @@ a:hover {
   letter-spacing: 0.04em;
 }
 
-.badge-primary { background: var(--primary-100); color: var(--primary-800); }
-.badge-success { background: var(--success-100); color: var(--success-600); }
-.badge-warning { background: var(--amber-100); color: var(--amber-600); }
-.badge-danger  { background: var(--danger-100); color: var(--danger-600); }
-.badge-neutral { background: var(--bg-muted); color: var(--text-secondary); }
+.badge-primary {
+  background: var(--primary-100);
+  color: var(--primary-800);
+}
+
+.badge-success {
+  background: var(--success-100);
+  color: var(--success-600);
+}
+
+.badge-warning {
+  background: var(--amber-100);
+  color: var(--amber-600);
+}
+
+.badge-danger {
+  background: var(--danger-100);
+  color: var(--danger-600);
+}
+
+.badge-neutral {
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+}
 
 /* Cards */
 .card {
@@ -331,7 +360,9 @@ a:hover {
   color: var(--text-main);
 }
 
-.form-input, .form-select, .form-textarea {
+.form-input,
+.form-select,
+.form-textarea {
   width: 100%;
   font-family: var(--font-main);
   font-size: 0.9375rem;
@@ -344,7 +375,9 @@ a:hover {
   transition: border-color var(--trans-fast), box-shadow var(--trans-fast);
 }
 
-.form-input:focus, .form-select:focus, .form-textarea:focus {
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
@@ -506,13 +539,16 @@ a:hover {
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: var(--bg-muted);
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border-medium);
   border-radius: var(--radius-pill);
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
@@ -564,6 +600,7 @@ a:hover {
   .institutional-slogan {
     display: none !important;
   }
+
   .institutional-subtitle {
     display: none !important;
   }
@@ -575,8 +612,53 @@ a:hover {
   }
 }
 
+/* Responsive Visibility & Sidebar Helpers */
+.hide-below-sm {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .hide-below-sm {
+    display: inline;
+  }
+}
+
+.hide-below-md {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .hide-below-md {
+    display: block;
+  }
+}
+
+.sidebar-wrapper {
+  display: none;
+}
+
+.sidebar-wrapper.is-open {
+  display: block;
+}
+
+@media (max-width: 1023px) {
+  .sidebar-wrapper {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    width: 260px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sidebar-wrapper {
+    display: block;
+  }
+}
+
 /* Dark Mode & High Contrast Compatibility */
-[data-theme='dark'], .theme-dark {
+[data-theme='dark'],
+.theme-dark {
   --bg-page: #070b1a;
   --bg-surface: #0c142b;
   --bg-surface-elevated: #111b38;

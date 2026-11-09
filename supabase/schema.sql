@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- CAMPUS: LA NORMAL - «Aprender mejor, juntos»
 -- Escuela Normal Superior Dr. Pedro Ignacio de Castro Barros - La Rioja, Argentina
--- Script de Base de Datos PostgreSQL / Supabase
+-- Script Completo de Base de Datos PostgreSQL / Supabase + Políticas RLS
 -- ==============================================================================
 
 -- 1. EXTENSIONES
@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ==============================================================================
 -- 2. TABLA: PROFILES (Perfiles de usuarios vinculados a Auth)
--- Almacena los datos y el rol:
+-- Almacena los datos y los 4 roles oficiales:
 -- 1. Estudiante ('student')
 -- 2. Docente ('teacher')
 -- 3. Administrador ('admin')
@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Si la tabla ya existía con la restricción anterior de 3 roles, actualizamos el CHECK:
 DO $$
 BEGIN
   ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
@@ -39,11 +38,10 @@ END $$;
 
 -- ==============================================================================
 -- 3. TABLA: COURSES (Cursos y Divisiones institucionales)
--- Ej: "1° Año - 1° División - Turno Mañana"
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.courses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,            -- Ej: '1° Año', '2° Año', etc.
+  name TEXT NOT NULL,            -- Ej: '1° Año', '5° Año', etc.
   division TEXT NOT NULL,        -- Ej: '1° División', '2° División', 'A'
   shift TEXT DEFAULT 'Mañana',   -- 'Mañana', 'Tarde', 'Noche'
   year INT DEFAULT 2026,
@@ -61,10 +59,18 @@ CREATE TABLE IF NOT EXISTS public.subjects (
   course_id UUID REFERENCES public.courses(id) ON DELETE SET NULL,
   status TEXT CHECK (status IN ('active', 'archived')) DEFAULT 'active',
   access_type TEXT CHECK (access_type IN ('open', 'request_only', 'invite_only')) DEFAULT 'request_only',
+  is_public BOOLEAN DEFAULT TRUE,
   color TEXT DEFAULT '#1e3a8a',
   syllabus JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'subjects' AND column_name = 'is_public') THEN
+    ALTER TABLE public.subjects ADD COLUMN is_public BOOLEAN DEFAULT TRUE;
+  END IF;
+END $$;
 
 -- ==============================================================================
 -- 5. TABLA: SUBJECT_TEACHERS (Asignación de docentes a materias)
@@ -197,32 +203,38 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 );
 
 -- ==============================================================================
--- 14. TABLA: AI_CONVERSATIONS (Interacciones del Tutor de IA por materia)
+-- 14. TABLA: AI_CONVERSATIONS (Interacciones del Tutor IA general o por materia)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.ai_conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  subject_id UUID NOT NULL REFERENCES public.subjects(id) ON DELETE CASCADE,
+  subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
   message TEXT NOT NULL,
   sources JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+DO $$
+BEGIN
+  ALTER TABLE public.ai_conversations ALTER COLUMN subject_id DROP NOT NULL;
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;
+
 -- ==============================================================================
 -- 15. FUNCIONES Y DISPARADORES DE SEGURIDAD
 -- ==============================================================================
 
--- Disparador automático al registrarse un usuario en Supabase Auth
+-- Disparador automático al registrarse un usuario mediante correo y contraseña en Supabase Auth.
 -- SEGURIDAD: Los nuevos registros se asignan siempre como 'student' o 'guest',
--- NUNCA como 'teacher' ni 'admin' sin autorización explícita.
+-- NUNCA como 'teacher' ni 'admin' sin autorización explícita de un administrador.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
   initial_role TEXT;
 BEGIN
   initial_role := COALESCE(NEW.raw_user_meta_data->>'role', 'student');
-  -- Seguridad estricta: bloquear auto-asignación de roles privilegiados
   IF initial_role NOT IN ('student', 'guest') THEN
     initial_role := 'student';
   END IF;
@@ -276,14 +288,13 @@ RETURNS BOOLEAN AS $$
   ) OR public.is_teacher_of(sub_id);
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
--- Comprobar si el usuario actual es invitado (guest)
 CREATE OR REPLACE FUNCTION public.is_guest()
 RETURNS BOOLEAN AS $$
   SELECT EXISTS(SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'guest');
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- ==============================================================================
--- 16. SEGURIDAD A NIVEL DE FILA (Row Level Security - RLS)
+-- 16. SEGURIDAD A NIVEL DE FILA (Row Level Security - RLS) EN LAS 13 TABLAS
 -- ==============================================================================
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
@@ -299,68 +310,173 @@ ALTER TABLE public.previous_subjects_prep ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_conversations ENABLE ROW LEVEL SECURITY;
 
--- Políticas en Profiles
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Profiles viewable by authenticated users') THEN
-    CREATE POLICY "Profiles viewable by authenticated users" ON public.profiles FOR SELECT TO authenticated USING (true);
-  END IF;
+-- 16.1 Políticas en Profiles (con bloqueo de auto-escalada de rol)
+DROP POLICY IF EXISTS "Profiles viewable by authenticated users" ON public.profiles;
+CREATE POLICY "Profiles viewable by authenticated users" ON public.profiles
+  FOR SELECT TO authenticated USING (true);
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can insert own profile') THEN
-    CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
-  END IF;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+CREATE POLICY "Users can insert own profile" ON public.profiles
+  FOR INSERT TO authenticated
+  WITH CHECK (id = auth.uid() AND role IN ('student', 'guest'));
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can update own profile') THEN
-    CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE TO authenticated USING (id = auth.uid());
-  END IF;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+CREATE POLICY "Users can update own profile" ON public.profiles
+  FOR UPDATE TO authenticated
+  USING (id = auth.uid())
+  WITH CHECK (id = auth.uid() AND role = public.get_current_role());
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Admins full access on profiles') THEN
-    CREATE POLICY "Admins full access on profiles" ON public.profiles FOR ALL TO authenticated USING (public.is_admin());
-  END IF;
-END $$;
+DROP POLICY IF EXISTS "Admins full access on profiles" ON public.profiles;
+CREATE POLICY "Admins full access on profiles" ON public.profiles
+  FOR ALL TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
--- Políticas en Materials (Biblioteca Digital de Archivos PDF)
-DO $$
-BEGIN
-  -- Docentes ven todos los materiales de sus materias; estudiantes matriculados ven únicamente los publicados ('published')
-  -- Invitados (guest) NO pueden acceder a los materiales protegidos
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Materials viewable by enrolled students and teachers') THEN
-    CREATE POLICY "Materials viewable by enrolled students and teachers" ON public.materials FOR SELECT TO authenticated 
-      USING (
-        (public.is_enrolled_in(subject_id) AND publication_status = 'published' AND NOT public.is_guest()) 
-        OR public.is_teacher_of(subject_id)
-      );
-  END IF;
+-- 16.2 Políticas en Courses (lectura pública de oferta institucional; escritura admin)
+DROP POLICY IF EXISTS "Courses viewable by everyone" ON public.courses;
+CREATE POLICY "Courses viewable by everyone" ON public.courses
+  FOR SELECT TO anon, authenticated USING (true);
 
-  -- Consulta pública al Tutor IA: cualquier persona (incluido anónimo o invitado) puede consultar documentos marcados como públicos autorizados
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public materials viewable by everyone') THEN
-    CREATE POLICY "Public materials viewable by everyone" ON public.materials FOR SELECT TO anon, authenticated
-      USING (is_public = TRUE AND publication_status = 'published');
-  END IF;
+DROP POLICY IF EXISTS "Admins manage courses" ON public.courses;
+CREATE POLICY "Admins manage courses" ON public.courses
+  FOR ALL TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
-  -- Solo docentes a cargo y administradores pueden subir, modificar o eliminar materiales
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Teachers and admin manage materials') THEN
-    CREATE POLICY "Teachers and admin manage materials" ON public.materials FOR ALL TO authenticated 
-      USING (public.is_teacher_of(subject_id))
-      WITH CHECK (public.is_teacher_of(subject_id));
-  END IF;
-END $$;
+-- 16.3 Políticas en Subjects (catálogo visible; gestión docente y admin)
+DROP POLICY IF EXISTS "Subjects viewable by authenticated" ON public.subjects;
+DROP POLICY IF EXISTS "Subjects viewable by everyone" ON public.subjects;
+CREATE POLICY "Subjects viewable by everyone" ON public.subjects
+  FOR SELECT TO anon, authenticated USING (true);
 
--- Políticas en Subjects
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Subjects viewable by authenticated') THEN
-    CREATE POLICY "Subjects viewable by authenticated" ON public.subjects FOR SELECT TO authenticated USING (true);
-  END IF;
+DROP POLICY IF EXISTS "Teachers and admin manage subjects" ON public.subjects;
+CREATE POLICY "Teachers and admin manage subjects" ON public.subjects
+  FOR ALL TO authenticated
+  USING (public.is_teacher_of(id) OR public.is_admin())
+  WITH CHECK (public.is_teacher_of(id) OR public.is_admin());
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Teachers and admin manage subjects') THEN
-    CREATE POLICY "Teachers and admin manage subjects" ON public.subjects FOR ALL TO authenticated USING (public.is_teacher_of(id) OR public.is_admin());
-  END IF;
-END $$;
+-- 16.4 Políticas en Subject_Teachers
+DROP POLICY IF EXISTS "Subject teachers viewable by authenticated" ON public.subject_teachers;
+CREATE POLICY "Subject teachers viewable by authenticated" ON public.subject_teachers
+  FOR SELECT TO authenticated USING (true);
 
--- Políticas de Storage para el bucket 'course-materials'
--- Configurar desde la consola de Supabase Storage:
--- 1. Crear el bucket 'course-materials' como público para lectura autorizada o con políticas RLS:
--- INSERT: solo docentes autenticados: (role IN ('teacher', 'admin'))
--- SELECT: usuarios autenticados matriculados o docentes
--- DELETE: docentes de la materia o admin
+DROP POLICY IF EXISTS "Admins manage subject teachers" ON public.subject_teachers;
+CREATE POLICY "Admins manage subject teachers" ON public.subject_teachers
+  FOR ALL TO authenticated
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+-- 16.5 Políticas en Subject_Students
+DROP POLICY IF EXISTS "Subject students viewable by owner or teacher" ON public.subject_students;
+CREATE POLICY "Subject students viewable by owner or teacher" ON public.subject_students
+  FOR SELECT TO authenticated
+  USING (student_id = auth.uid() OR public.is_teacher_of(subject_id) OR public.is_admin());
+
+DROP POLICY IF EXISTS "Teachers and admins manage enrollments" ON public.subject_students;
+CREATE POLICY "Teachers and admins manage enrollments" ON public.subject_students
+  FOR ALL TO authenticated
+  USING (public.is_teacher_of(subject_id) OR public.is_admin())
+  WITH CHECK (public.is_teacher_of(subject_id) OR public.is_admin());
+
+-- 16.6 Políticas en Access_Requests
+DROP POLICY IF EXISTS "Access requests viewable by student or teacher" ON public.access_requests;
+CREATE POLICY "Access requests viewable by student or teacher" ON public.access_requests
+  FOR SELECT TO authenticated
+  USING (student_id = auth.uid() OR public.is_teacher_of(subject_id) OR public.is_admin());
+
+DROP POLICY IF EXISTS "Students create own access requests" ON public.access_requests;
+CREATE POLICY "Students create own access requests" ON public.access_requests
+  FOR INSERT TO authenticated
+  WITH CHECK (student_id = auth.uid() AND NOT public.is_guest());
+
+DROP POLICY IF EXISTS "Teachers and admins review access requests" ON public.access_requests;
+CREATE POLICY "Teachers and admins review access requests" ON public.access_requests
+  FOR UPDATE TO authenticated
+  USING (public.is_teacher_of(subject_id) OR public.is_admin())
+  WITH CHECK (public.is_teacher_of(subject_id) OR public.is_admin());
+
+-- 16.7 Políticas en Folders
+DROP POLICY IF EXISTS "Folders viewable by enrolled and teachers" ON public.folders;
+CREATE POLICY "Folders viewable by enrolled and teachers" ON public.folders
+  FOR SELECT TO authenticated
+  USING ((public.is_enrolled_in(subject_id) AND NOT public.is_guest()) OR public.is_teacher_of(subject_id));
+
+DROP POLICY IF EXISTS "Teachers and admins manage folders" ON public.folders;
+CREATE POLICY "Teachers and admins manage folders" ON public.folders
+  FOR ALL TO authenticated
+  USING (public.is_teacher_of(subject_id))
+  WITH CHECK (public.is_teacher_of(subject_id));
+
+-- 16.8 Políticas en Materials (Biblioteca Digital de Archivos PDF)
+DROP POLICY IF EXISTS "Materials viewable by enrolled students and teachers" ON public.materials;
+CREATE POLICY "Materials viewable by enrolled students and teachers" ON public.materials
+  FOR SELECT TO authenticated
+  USING (
+    (public.is_enrolled_in(subject_id) AND publication_status = 'published' AND NOT public.is_guest())
+    OR public.is_teacher_of(subject_id)
+  );
+
+DROP POLICY IF EXISTS "Public materials viewable by everyone" ON public.materials;
+CREATE POLICY "Public materials viewable by everyone" ON public.materials
+  FOR SELECT TO anon, authenticated
+  USING (is_public = TRUE AND publication_status = 'published');
+
+DROP POLICY IF EXISTS "Teachers and admin manage materials" ON public.materials;
+CREATE POLICY "Teachers and admin manage materials" ON public.materials
+  FOR ALL TO authenticated
+  USING (public.is_teacher_of(subject_id))
+  WITH CHECK (public.is_teacher_of(subject_id));
+
+-- 16.9 Políticas en Classes y Class_Materials
+DROP POLICY IF EXISTS "Published classes viewable by everyone" ON public.classes;
+CREATE POLICY "Published classes viewable by everyone" ON public.classes
+  FOR SELECT TO anon, authenticated
+  USING (status = 'published' OR public.is_teacher_of(subject_id));
+
+DROP POLICY IF EXISTS "Teachers and admins manage classes" ON public.classes;
+CREATE POLICY "Teachers and admins manage classes" ON public.classes
+  FOR ALL TO authenticated
+  USING (public.is_teacher_of(subject_id))
+  WITH CHECK (public.is_teacher_of(subject_id));
+
+DROP POLICY IF EXISTS "Class materials viewable by enrolled" ON public.class_materials;
+CREATE POLICY "Class materials viewable by enrolled" ON public.class_materials
+  FOR SELECT TO authenticated
+  USING (NOT public.is_guest());
+
+DROP POLICY IF EXISTS "Teachers and admins manage class materials" ON public.class_materials;
+CREATE POLICY "Teachers and admins manage class materials" ON public.class_materials
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.classes c
+      WHERE c.id = class_id AND public.is_teacher_of(c.subject_id)
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.classes c
+      WHERE c.id = class_id AND public.is_teacher_of(c.subject_id)
+    )
+  );
+
+-- 16.10 Políticas en Previous_Subjects_Prep
+DROP POLICY IF EXISTS "Students manage own previous subjects prep" ON public.previous_subjects_prep;
+CREATE POLICY "Students manage own previous subjects prep" ON public.previous_subjects_prep
+  FOR ALL TO authenticated
+  USING ((student_id = auth.uid() AND NOT public.is_guest()) OR public.is_admin())
+  WITH CHECK ((student_id = auth.uid() AND NOT public.is_guest()) OR public.is_admin());
+
+-- 16.11 Políticas en Notifications
+DROP POLICY IF EXISTS "Users view and update own notifications" ON public.notifications;
+CREATE POLICY "Users view and update own notifications" ON public.notifications
+  FOR ALL TO authenticated
+  USING (user_id = auth.uid() OR public.is_admin())
+  WITH CHECK (user_id = auth.uid() OR public.is_admin() OR public.get_current_role() = 'teacher');
+
+-- 16.12 Políticas en AI_Conversations (Tutor IA unificado)
+DROP POLICY IF EXISTS "Users manage own ai conversations" ON public.ai_conversations;
+CREATE POLICY "Users manage own ai conversations" ON public.ai_conversations
+  FOR ALL TO authenticated
+  USING (student_id = auth.uid() OR public.is_admin())
+  WITH CHECK (student_id = auth.uid() OR public.is_admin());

@@ -1,31 +1,44 @@
-import { supabase } from '../config/supabaseClient';
+import { supabase, isRemoteUUID, isRemoteAvailable, markRemoteUnavailable } from '../config/supabaseClient';
 
-const withTimeout = (promise, ms = 2000) => {
+const withTimeout = (promise, ms = 800) => {
+  if (!isRemoteAvailable()) {
+    return Promise.reject(new Error('Remote temporarily unavailable'));
+  }
   let timeoutId;
   const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('Query timeout')), ms);
+    timeoutId = setTimeout(() => {
+      markRemoteUnavailable();
+      reject(new Error('Query timeout'));
+    }, ms);
   });
-  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+  return Promise.race([promise, timeoutPromise])
+    .catch((err) => {
+      markRemoteUnavailable();
+      throw err;
+    })
+    .finally(() => clearTimeout(timeoutId));
 };
 
 export const previousSubjectsService = {
   // Get student's previous subjects preparations
   async getStudentPreps(studentId) {
-    try {
-      const query = supabase
-        .from('previous_subjects_prep')
-        .select(`
-          *,
-          subjects (*, courses (*))
-        `)
-        .eq('student_id', studentId);
-      const { data, error } = await withTimeout(query);
-      if (error) throw error;
-      return data || [];
-    } catch {
-      const local = JSON.parse(localStorage.getItem(`prev_prep_${studentId}`) || '[]');
-      return local;
+    if (isRemoteUUID(studentId)) {
+      try {
+        const query = supabase
+          .from('previous_subjects_prep')
+          .select(`
+            *,
+            subjects (*, courses (*))
+          `)
+          .eq('student_id', studentId);
+        const { data, error } = await withTimeout(query);
+        if (!error && data) return data;
+      } catch {
+        // Fallback local
+      }
     }
+    const local = JSON.parse(localStorage.getItem(`prev_prep_${studentId}`) || '[]');
+    return local;
   },
 
   // Enroll in a previous subject preparation plan
@@ -39,26 +52,29 @@ export const previousSubjectsService = {
       completed_units: [],
     };
 
-    try {
-      const query = supabase
-        .from('previous_subjects_prep')
-        .upsert(record, { onConflict: 'student_id,subject_id' })
-        .select(`*, subjects (*, courses (*))`)
-        .single();
-      const { data, error } = await withTimeout(query);
-      if (error) throw error;
-      return data;
-    } catch {
-      const all = await this.getStudentPreps(studentId);
-      const filtered = all.filter((p) => p.subject_id !== subjectId);
-      const newPlan = {
-        ...record,
-        id: 'prep-' + Date.now(),
-        created_at: new Date().toISOString(),
-      };
-      localStorage.setItem(`prev_prep_${studentId}`, JSON.stringify([...filtered, newPlan]));
-      return newPlan;
+    if (isRemoteUUID(studentId) && isRemoteUUID(subjectId)) {
+      try {
+        const query = supabase
+          .from('previous_subjects_prep')
+          .upsert(record, { onConflict: 'student_id,subject_id' })
+          .select(`*, subjects (*, courses (*))`)
+          .single();
+        const { data, error } = await withTimeout(query);
+        if (!error && data) return data;
+      } catch {
+        // Fallback local
+      }
     }
+
+    const all = await this.getStudentPreps(studentId);
+    const filtered = all.filter((p) => p.subject_id !== subjectId);
+    const newPlan = {
+      ...record,
+      id: 'prep-' + Date.now(),
+      created_at: new Date().toISOString(),
+    };
+    localStorage.setItem(`prev_prep_${studentId}`, JSON.stringify([...filtered, newPlan]));
+    return newPlan;
   },
 
   // Toggle unit completion status
@@ -76,29 +92,32 @@ export const previousSubjectsService = {
 
     const progress = totalUnits > 0 ? Math.round((completed.length / totalUnits) * 100) : 0;
 
-    try {
-      const query = supabase
-        .from('previous_subjects_prep')
-        .update({
-          completed_units: completed,
-          progress_percent: progress,
-        })
-        .eq('student_id', studentId)
-        .eq('subject_id', subjectId)
-        .select()
-        .single();
-      const { data, error } = await withTimeout(query);
-      if (error) throw error;
-      return data;
-    } catch {
-      const updated = preps.map((p) =>
-        p.subject_id === subjectId
-          ? { ...p, completed_units: completed, progress_percent: progress }
-          : p
-      );
-      localStorage.setItem(`prev_prep_${studentId}`, JSON.stringify(updated));
-      return updated.find((p) => p.subject_id === subjectId);
+    if (isRemoteUUID(studentId) && isRemoteUUID(subjectId)) {
+      try {
+        const query = supabase
+          .from('previous_subjects_prep')
+          .update({
+            completed_units: completed,
+            progress_percent: progress,
+          })
+          .eq('student_id', studentId)
+          .eq('subject_id', subjectId)
+          .select()
+          .single();
+        const { data, error } = await withTimeout(query);
+        if (!error && data) return data;
+      } catch {
+        // Fallback local
+      }
     }
+
+    const updated = preps.map((p) =>
+      p.subject_id === subjectId
+        ? { ...p, completed_units: completed, progress_percent: progress }
+        : p
+    );
+    localStorage.setItem(`prev_prep_${studentId}`, JSON.stringify(updated));
+    return updated.find((p) => p.subject_id === subjectId);
   },
 
   // Update target date or personal study notes

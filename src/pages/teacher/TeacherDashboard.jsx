@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { subjectService } from '../../services/subjectService';
 import { 
   BookOpen, 
-  FolderArchive, 
   Calendar, 
-  Plus, 
   Users, 
   Sparkles,
   ArrowRight
@@ -14,10 +12,13 @@ import {
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 import { InstitutionalLogo } from '../../components/common/InstitutionalLogo';
+import { AITutorPage } from '../ai/AITutorPage';
 
 export const TeacherDashboard = () => {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isMainPanel = location.pathname === '/panel';
   const [subjects, setSubjects] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -93,8 +94,15 @@ export const TeacherDashboard = () => {
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
-            onClick={() => navigate('/profesor/materias')}
+            onClick={() => navigate('/tutor-ia')}
             className="btn btn-accent"
+          >
+            <Sparkles size={16} /> Tutor IA Pedagógico
+          </button>
+          <button
+            onClick={() => navigate('/profesor/materias')}
+            className="btn"
+            style={{ backgroundColor: 'rgba(255,255,255,0.18)', color: '#ffffff', backdropFilter: 'blur(4px)' }}
           >
             <BookOpen size={16} /> Mis Materias
           </button>
@@ -126,6 +134,13 @@ export const TeacherDashboard = () => {
             Revisar en el Aula
           </button>
         </div>
+      )}
+
+      {/* Tutor IA Unificado Integrado en el Panel Principal Docente */}
+      {isMainPanel && (
+        <section style={{ marginBottom: '2.5rem' }} aria-label="Tutor IA Pedagógico">
+          <AITutorPage embedded={true} fullWidth={true} />
+        </section>
       )}
 
       {/* Mis Materias Asignadas */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { subjectService } from '../../services/subjectService';
 import { 
@@ -14,10 +14,13 @@ import {
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
 import { InstitutionalLogo } from '../../components/common/InstitutionalLogo';
+import { AITutorPage } from '../ai/AITutorPage';
 
 export const StudentDashboard = () => {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isMainPanel = location.pathname === '/panel';
 
   const [enrolledSubjects, setEnrolledSubjects] = useState([]);
   const [allSubjects, setAllSubjects] = useState([]);
@@ -97,10 +100,17 @@ export const StudentDashboard = () => {
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
-            onClick={() => navigate('/estudiante/biblioteca')}
+            onClick={() => navigate('/tutor-ia')}
             className="btn btn-accent"
           >
-            <FolderArchive size={16} /> Biblioteca de Archivos PDF
+            <Sparkles size={16} /> Tutor IA Pantalla Completa
+          </button>
+          <button
+            onClick={() => navigate('/estudiante/biblioteca')}
+            className="btn"
+            style={{ backgroundColor: 'rgba(255,255,255,0.18)', color: '#ffffff', backdropFilter: 'blur(4px)' }}
+          >
+            <FolderArchive size={16} /> Biblioteca PDF
           </button>
           <button
             onClick={() => navigate('/calendario')}
@@ -111,6 +121,13 @@ export const StudentDashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Tutor IA Unificado Integrado en el Panel Principal Estudiantil */}
+      {isMainPanel && (
+        <section style={{ marginBottom: '2.5rem' }} aria-label="Tutor IA Pedagógico">
+          <AITutorPage embedded={true} fullWidth={true} />
+        </section>
+      )}
 
       {/* Materias Habilitadas / Inscriptas */}
       <div style={{ marginBottom: '2.5rem' }}>
@@ -214,6 +231,16 @@ export const StudentDashboard = () => {
 
       {/* Accesos Rápidos Estudiantiles */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
+        <Link to="/tutor-ia" className="card card-interactive" style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none' }}>
+          <div style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--brand-orange-light)', color: 'var(--brand-orange)' }}>
+            <Sparkles size={24} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-900)' }}>Tutor Pedagógico IA</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Consultá sobre tus materias y cuadernillos</div>
+          </div>
+        </Link>
+
         <Link to="/estudiante/biblioteca" className="card card-interactive" style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none' }}>
           <div style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--primary-50)', color: 'var(--primary-800)' }}>
             <FolderArchive size={24} />
