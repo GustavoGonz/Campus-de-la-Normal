@@ -12,12 +12,14 @@ import {
   GraduationCap, 
   Menu,
   CheckCircle,
-  ExternalLink
+  ExternalLink,
+  UserCheck
 } from 'lucide-react';
 import { SearchModal } from './SearchModal';
+import { InstitutionalLogo } from './InstitutionalLogo';
 
 export const Navbar = ({ onToggleSidebar }) => {
-  const { user, profile, role, isAdmin, isTeacher, isStudent, signOut, switchDevRole } = useAuth();
+  const { user, profile, role, isAdmin, isTeacher, isStudent, isGuest, signOut } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const navigate = useNavigate();
 
@@ -30,54 +32,45 @@ export const Navbar = ({ onToggleSidebar }) => {
     navigate('/');
   };
 
+  // Badge representativo de los 4 roles en el orden y estilo institucional
   const getRoleBadge = () => {
-    if (isAdmin) return <span className="badge badge-danger"><Shield size={12} /> Admin</span>;
-    if (isTeacher) return <span className="badge badge-primary"><BookOpen size={12} /> Profesor</span>;
+    if (isAdmin) {
+      return <span className="badge badge-danger"><Shield size={12} /> Administrador</span>;
+    }
+    if (isTeacher) {
+      return <span className="badge badge-primary"><BookOpen size={12} /> Docente</span>;
+    }
+    if (isGuest) {
+      return <span className="badge badge-neutral" style={{ backgroundColor: '#e2e8f0', color: '#334155' }}><UserCheck size={12} /> Invitado</span>;
+    }
     return <span className="badge badge-success"><GraduationCap size={12} /> Estudiante</span>;
   };
 
   return (
     <>
       <header className="header-nav">
-        {/* Left: Mobile trigger & Brand */}
+        {/* Izquierda: Menú móvil y Logo institucional */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button
             onClick={onToggleSidebar}
             className="btn btn-ghost btn-sm"
             style={{ padding: '0.4rem' }}
-            aria-label="Abrir menú"
+            aria-label="Abrir menú de navegación"
           >
             <Menu size={22} />
           </button>
 
-          <Link to="/panel" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none' }}>
-            <div style={{
-              width: '38px',
-              height: '38px',
-              backgroundColor: 'var(--primary-800)',
-              borderRadius: 'var(--radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              boxShadow: '0 2px 6px rgba(30, 58, 138, 0.3)',
-            }}>
-              <GraduationCap size={22} />
-            </div>
-            <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.15rem', color: 'var(--primary-900)', lineHeight: 1.1 }}>
-                Campus: <span style={{ color: 'var(--primary-700)' }}>La Normal</span>
-              </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                Aprender mejor, juntos.
-              </div>
-            </div>
-          </Link>
+          <InstitutionalLogo
+            variant="horizontal"
+            size="md"
+            to="/panel"
+            showSlogan={true}
+          />
         </div>
 
-        {/* Center/Right: Actions */}
+        {/* Derecha: Búsqueda, Notificaciones y Perfil */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {/* Quick Global Search */}
+          {/* Búsqueda global */}
           <button
             onClick={() => setShowSearch(true)}
             className="btn btn-secondary btn-sm"
@@ -87,63 +80,13 @@ export const Navbar = ({ onToggleSidebar }) => {
             <span style={{ display: 'none', '@media (min-width: 640px)': { display: 'inline' } }}>Buscar...</span>
           </button>
 
-          {/* Dev Role Quick Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: 'var(--bg-muted)', padding: '0.2rem 0.4rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border-light)' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', padding: '0 0.3rem', fontWeight: 600 }}>ROL:</span>
-            <button
-              onClick={() => switchDevRole('student')}
-              style={{
-                fontSize: '0.72rem',
-                padding: '0.2rem 0.5rem',
-                border: 'none',
-                borderRadius: 'var(--radius-pill)',
-                cursor: 'pointer',
-                backgroundColor: role === 'student' ? 'var(--success-600)' : 'transparent',
-                color: role === 'student' ? '#fff' : 'var(--text-secondary)',
-                fontWeight: 600,
-              }}
-            >
-              Estudiante
-            </button>
-            <button
-              onClick={() => switchDevRole('teacher')}
-              style={{
-                fontSize: '0.72rem',
-                padding: '0.2rem 0.5rem',
-                border: 'none',
-                borderRadius: 'var(--radius-pill)',
-                cursor: 'pointer',
-                backgroundColor: role === 'teacher' ? 'var(--primary-800)' : 'transparent',
-                color: role === 'teacher' ? '#fff' : 'var(--text-secondary)',
-                fontWeight: 600,
-              }}
-            >
-              Profesor
-            </button>
-            <button
-              onClick={() => switchDevRole('admin')}
-              style={{
-                fontSize: '0.72rem',
-                padding: '0.2rem 0.5rem',
-                border: 'none',
-                borderRadius: 'var(--radius-pill)',
-                cursor: 'pointer',
-                backgroundColor: role === 'admin' ? 'var(--danger-600)' : 'transparent',
-                color: role === 'admin' ? '#fff' : 'var(--text-secondary)',
-                fontWeight: 600,
-              }}
-            >
-              Admin
-            </button>
-          </div>
-
-          {/* Notifications Bell */}
+          {/* Campana de Notificaciones */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="btn btn-ghost btn-sm"
               style={{ position: 'relative', padding: '0.5rem', borderRadius: '50%' }}
-              aria-label="Notificaciones"
+              aria-label="Notificaciones del Campus"
             >
               <Bell size={20} />
               {unreadCount > 0 && (
@@ -168,7 +111,7 @@ export const Navbar = ({ onToggleSidebar }) => {
               )}
             </button>
 
-            {/* Notifications Dropdown */}
+            {/* Menú desplegable de Notificaciones */}
             {showNotifications && (
               <div style={{
                 position: 'absolute',
@@ -244,7 +187,7 @@ export const Navbar = ({ onToggleSidebar }) => {
             )}
           </div>
 
-          {/* User Menu */}
+          {/* Menú de Usuario */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
@@ -273,13 +216,13 @@ export const Navbar = ({ onToggleSidebar }) => {
               </div>
             </button>
 
-            {/* User Dropdown */}
+            {/* Dropdown del Usuario */}
             {showUserMenu && (
               <div style={{
                 position: 'absolute',
                 right: 0,
                 top: 'calc(100% + 8px)',
-                width: '220px',
+                width: '240px',
                 backgroundColor: 'var(--bg-surface)',
                 borderRadius: 'var(--radius-md)',
                 boxShadow: 'var(--shadow-lg)',
@@ -332,7 +275,7 @@ export const Navbar = ({ onToggleSidebar }) => {
         </div>
       </header>
 
-      {/* Global Search Dialog */}
+      {/* Cuadro de Búsqueda Global */}
       <SearchModal isOpen={showSearch} onClose={() => setShowSearch(false)} />
     </>
   );

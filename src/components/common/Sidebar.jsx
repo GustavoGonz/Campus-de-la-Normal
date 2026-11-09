@@ -6,50 +6,67 @@ import {
   BookOpen,
   FolderArchive,
   Calendar,
-  CheckSquare,
   Sparkles,
   BookmarkCheck,
   Users,
-  Settings,
   X,
-  GraduationCap
+  UserCheck
 } from 'lucide-react';
+import { InstitutionalLogo } from './InstitutionalLogo';
 
 export const Sidebar = ({ isOpen, onClose }) => {
-  const { role, isAdmin, isTeacher, isStudent } = useAuth();
+  const { role, isAdmin, isTeacher, isGuest, isStudent } = useAuth();
 
   const teacherLinks = [
-    { to: '/panel', label: 'Panel Docente', icon: LayoutDashboard },
-    { to: '/profesor/materias', label: 'Mis Materias', icon: BookOpen },
-    { to: '/profesor/biblioteca', label: 'Biblioteca Anual', icon: FolderArchive },
-    { to: '/profesor/clases', label: 'Clases y Planificación', icon: Calendar },
-    { to: '/profesor/actividades', label: 'Actividades y Entregas', icon: CheckSquare },
+    { to: '/panel', label: 'Inicio (Tutor IA)', icon: LayoutDashboard },
+    { to: '/tutor-ia', label: 'Tutor Pedagógico', icon: Sparkles },
+    { to: '/profesor/biblioteca', label: 'Biblioteca Digital', icon: FolderArchive },
+    { to: '/profesor/materias', label: 'Mis Cátedras', icon: BookOpen },
+    { to: '/profesor/clases', label: 'Clases y Cronograma', icon: Calendar },
     { to: '/materias-previas', label: 'Materias Previas', icon: BookmarkCheck },
     { to: '/calendario', label: 'Calendario Escolar', icon: Calendar },
-    { to: '/tutor-ia', label: 'Tutor de IA', icon: Sparkles },
   ];
 
   const studentLinks = [
-    { to: '/panel', label: 'Mi Espacio', icon: LayoutDashboard },
+    { to: '/panel', label: 'Inicio (Tutor IA)', icon: LayoutDashboard },
+    { to: '/tutor-ia', label: 'Tutor Pedagógico', icon: Sparkles },
+    { to: '/estudiante/biblioteca', label: 'Biblioteca Digital', icon: FolderArchive },
     { to: '/estudiante/materias', label: 'Mis Materias', icon: BookOpen },
-    { to: '/estudiante/biblioteca', label: 'Biblioteca de Materiales', icon: FolderArchive },
-    { to: '/estudiante/actividades', label: 'Actividades y Tareas', icon: CheckSquare },
     { to: '/materias-previas', label: 'Materias Previas', icon: BookmarkCheck },
     { to: '/calendario', label: 'Calendario Escolar', icon: Calendar },
-    { to: '/tutor-ia', label: 'Tutor de IA', icon: Sparkles },
   ];
 
   const adminLinks = [
-    { to: '/panel', label: 'Panel de Control', icon: LayoutDashboard },
+    { to: '/panel', label: 'Inicio (Tutor IA)', icon: LayoutDashboard },
+    { to: '/tutor-ia', label: 'Tutor Pedagógico', icon: Sparkles },
     { to: '/admin/usuarios', label: 'Gestión de Usuarios', icon: Users },
     { to: '/admin/materias', label: 'Materias y Cursos', icon: BookOpen },
-    { to: '/admin/solicitudes', label: 'Solicitudes de Acceso', icon: CheckSquare },
+    { to: '/profesor/biblioteca', label: 'Control de Biblioteca', icon: FolderArchive },
     { to: '/materias-previas', label: 'Materias Previas', icon: BookmarkCheck },
     { to: '/calendario', label: 'Calendario Escolar', icon: Calendar },
-    { to: '/tutor-ia', label: 'Tutor de IA', icon: Sparkles },
   ];
 
-  const links = isAdmin ? adminLinks : isTeacher ? teacherLinks : studentLinks;
+  const guestLinks = [
+    { to: '/panel', label: 'Inicio (Tutor IA)', icon: LayoutDashboard },
+    { to: '/tutor-ia', label: 'Tutor IA Público', icon: Sparkles },
+    { to: '/calendario', label: 'Calendario Escolar', icon: Calendar },
+  ];
+
+  const links = isAdmin 
+    ? adminLinks 
+    : isTeacher 
+    ? teacherLinks 
+    : isGuest 
+    ? guestLinks 
+    : studentLinks;
+
+  const roleText = isAdmin 
+    ? 'Administrativa' 
+    : isTeacher 
+    ? 'Docente' 
+    : isGuest 
+    ? 'Invitado' 
+    : 'Estudiantil';
 
   return (
     <>
@@ -85,7 +102,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
           flexShrink: 0,
         }}
       >
-        {/* Top Header inside Sidebar */}
+        {/* Cabecera institucional del Sidebar */}
         <div style={{
           padding: '1.25rem 1.5rem',
           borderBottom: '1px solid var(--border-light)',
@@ -93,12 +110,12 @@ export const Sidebar = ({ isOpen, onClose }) => {
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <GraduationCap size={22} color="var(--primary-800)" />
-            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--primary-900)' }}>
-              Campus: La Normal
-            </span>
-          </div>
+          <InstitutionalLogo
+            variant="horizontal"
+            size="sm"
+            showSlogan={false}
+            to="/panel"
+          />
           {onClose && (
             <button onClick={onClose} className="btn btn-ghost btn-sm" style={{ padding: '0.2rem' }}>
               <X size={18} />
@@ -106,7 +123,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
           )}
         </div>
 
-        {/* Navigation Items */}
+        {/* Elementos de Navegación */}
         <nav style={{ padding: '1rem 0.75rem', flex: 1, overflowY: 'auto' }}>
           <div style={{
             fontSize: '0.7rem',
@@ -116,10 +133,10 @@ export const Sidebar = ({ isOpen, onClose }) => {
             letterSpacing: '0.08em',
             padding: '0 0.75rem 0.5rem',
           }}>
-            Navegación {isAdmin ? 'Administrativa' : isTeacher ? 'Docente' : 'Estudiantil'}
+            Navegación {roleText}
           </div>
 
-          <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem', margin: 0, padding: 0 }}>
             {links.map((item) => {
               const Icon = item.icon;
               return (
@@ -127,7 +144,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
                   <NavLink
                     to={item.to}
                     onClick={() => {
-                      if (window.innerWidth < 1024) onClose();
+                      if (window.innerWidth < 1024 && onClose) onClose();
                     }}
                     style={({ isActive }) => ({
                       display: 'flex',
@@ -152,7 +169,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
           </ul>
         </nav>
 
-        {/* Footer info */}
+        {/* Pie con identidad de la escuela */}
         <div style={{
           padding: '1rem 1.25rem',
           borderTop: '1px solid var(--border-light)',
@@ -161,7 +178,10 @@ export const Sidebar = ({ isOpen, onClose }) => {
           <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-main)' }}>
             Escuela Normal Superior
           </div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--brand-orange, #ff7b15)', fontWeight: 600 }}>
+            «Aprender mejor, juntos»
+          </div>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
             La Rioja, Argentina • Ciclo 2026
           </div>
         </div>

@@ -1,15 +1,21 @@
 -- ==============================================================================
--- CAMPUS: LA NORMAL - Configuración Segura del Primer Administrador
+-- CAMPUS: LA NORMAL - Configuración de Roles y Administrador
+-- Escuela Normal Dr. Pedro Ignacio de Castro Barros • «Aprender mejor, juntos»
 -- ==============================================================================
--- Instrucciones:
--- 1. Registrate normalmente desde la página de inicio o pantalla de registro.
--- 2. Copiá el correo electrónico que usaste para registrarte.
--- 3. En la consola SQL de Supabase (o ejecutando esta consulta), reemplazá
---    'tu_correo@ejemplo.com' con tu correo real y ejecutá:
+--
+-- Orden de Roles Institucionales:
+-- 1. Estudiante ('student')
+-- 2. Docente ('teacher')
+-- 3. Administrador ('admin')
+-- 4. Invitado ('guest')
+--
+-- Instrucciones para asignar el primer Administrador:
+-- 1. Registrate normalmente desde la pantalla de inicio con tu correo de Gmail.
+-- 2. En la consola SQL de Supabase (SQL Editor), ejecutá:
 
 UPDATE public.profiles
 SET role = 'admin'
-WHERE email = 'tu_correo@ejemplo.com';
+WHERE email = 'tu_correo@gmail.com';
 
--- Para verificar que se asignó correctamente:
-SELECT id, email, full_name, role, is_active FROM public.profiles WHERE role = 'admin';
+-- Para verificar los usuarios y sus roles asignados:
+SELECT id, email, full_name, role, is_active FROM public.profiles ORDER BY role;

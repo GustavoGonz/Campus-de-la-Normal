@@ -6,15 +6,14 @@ import {
   BookOpen, 
   FolderArchive, 
   Calendar, 
-  CheckSquare, 
   Sparkles, 
   BookmarkCheck, 
   ArrowRight,
-  Lock,
-  Clock
+  Lock
 } from 'lucide-react';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EmptyState } from '../../components/common/EmptyState';
+import { InstitutionalLogo } from '../../components/common/InstitutionalLogo';
 
 export const StudentDashboard = () => {
   const { user, profile } = useAuth();
@@ -35,7 +34,7 @@ export const StudentDashboard = () => {
         setEnrolledSubjects(enrolled);
         setAllSubjects(all);
       } catch (err) {
-        console.error('Student dashboard error:', err);
+        console.error('Error en espacio estudiantil:', err);
       } finally {
         setLoading(false);
       }
@@ -51,55 +50,75 @@ export const StudentDashboard = () => {
 
   return (
     <div>
-      {/* Student Welcome Banner */}
-      <div style={{
-        padding: '2rem 2.25rem',
-        borderRadius: 'var(--radius-lg)',
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)',
-        color: '#ffffff',
-        marginBottom: '2rem',
-        boxShadow: 'var(--shadow-md)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '1.5rem',
-      }}>
-        <div>
-          <div style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.85, fontWeight: 700, marginBottom: '0.25rem' }}>
-            Escuela Normal Superior de La Rioja • Ciclo 2026
+      {/* Banner de Bienvenida Estudiantil */}
+      <div
+        className="institutional-banner"
+        style={{
+          padding: '2rem 2.25rem',
+          color: '#ffffff',
+          marginBottom: '2rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1.5rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+          <InstitutionalLogo variant="symbol" size="lg" theme="dark" />
+          <div>
+            <div style={{
+              fontSize: '0.8rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              fontWeight: 700,
+              color: '#ffffff',
+              opacity: 0.9,
+              marginBottom: '0.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              flexWrap: 'wrap',
+            }}>
+              <span>Espacio Estudiantil</span>
+              <span>•</span>
+              <span style={{ color: 'var(--brand-orange, #ff7b15)' }}>Campus: La Normal</span>
+              <span>•</span>
+              <span style={{ opacity: 0.85 }}>«Aprender mejor, juntos»</span>
+            </div>
+            <h1 style={{ color: '#ffffff', fontSize: '1.85rem', marginBottom: '0.4rem', fontFamily: 'var(--font-display)' }}>
+              ¡Hola, {profile?.full_name || 'Estudiante'}!
+            </h1>
+            <p style={{ opacity: 0.92, fontSize: '0.93rem', maxWidth: '640px', lineHeight: 1.5, margin: 0 }}>
+              Escuela Normal Dr. Pedro Ignacio de Castro Barros • La Rioja. Accedé a la biblioteca digital de archivos PDF de tus materias, consultá las clases y prepará tus materias con el tutor inteligente.
+            </p>
           </div>
-          <h1 style={{ color: '#ffffff', fontSize: '1.85rem', marginBottom: '0.5rem' }}>
-            ¡Hola, {profile?.full_name || 'Estudiante'}!
-          </h1>
-          <p style={{ opacity: 0.9, fontSize: '0.95rem', maxWidth: '620px' }}>
-            Revisá tus clases del día, descargá los materiales oficiales de tus profesores y prepará tus materias con el tutor de IA.
-          </p>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
-            onClick={() => navigate('/tutor-ia')}
+            onClick={() => navigate('/estudiante/biblioteca')}
             className="btn btn-accent"
           >
-            <Sparkles size={16} /> Tutor Inteligente IA
+            <FolderArchive size={16} /> Biblioteca de Archivos PDF
           </button>
           <button
-            onClick={() => navigate('/materias-previas')}
-            className="btn btn-secondary"
+            onClick={() => navigate('/calendario')}
+            className="btn"
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#ffffff', backdropFilter: 'blur(4px)' }}
           >
-            <BookmarkCheck size={16} /> Materias Previas
+            <Calendar size={16} /> Calendario Escolar
           </button>
         </div>
       </div>
 
-      {/* Enrolled Subjects */}
+      {/* Materias Habilitadas / Inscriptas */}
       <div style={{ marginBottom: '2.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div>
             <h2 style={{ fontSize: '1.4rem', color: 'var(--primary-900)' }}>Mis Materias Habilitadas</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-              Espacios curriculares en los que contás con autorización y acceso activo.
+              Espacios curriculares en los que contás con matrícula y acceso a la biblioteca de documentos.
             </p>
           </div>
         </div>
@@ -107,7 +126,7 @@ export const StudentDashboard = () => {
         {enrolledSubjects.length === 0 ? (
           <EmptyState
             icon={BookOpen}
-            title="Aún no estás matriculado en ninguna materia"
+            title="Aún no estás matriculado/a en ninguna materia"
             description="Revisá la lista de materias disponibles abajo y solicitá acceso a tus profesores."
           />
         ) : (
@@ -125,7 +144,7 @@ export const StudentDashboard = () => {
               >
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                    <span className="badge badge-success">Autorizado</span>
+                    <span className="badge badge-success">Matriculado</span>
                     <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                       {sub.courses?.name || '1° Año'}
                     </span>
@@ -136,7 +155,7 @@ export const StudentDashboard = () => {
                   </h3>
 
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.4, marginBottom: '1.25rem' }}>
-                    {sub.description || 'Contenidos educativos y bibliografía.'}
+                    {sub.description || 'Biblioteca de lecturas en formato PDF y contenidos oficiales.'}
                   </p>
                 </div>
 
@@ -144,9 +163,9 @@ export const StudentDashboard = () => {
                   <Link
                     to={`/estudiante/materia/${sub.id}`}
                     className="btn btn-primary btn-sm"
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, justifyContent: 'center' }}
                   >
-                    Ingresar al Aula <ArrowRight size={14} />
+                    Ver Biblioteca PDF <ArrowRight size={14} />
                   </Link>
                   <Link
                     to={`/tutor-ia?subject=${sub.id}`}
@@ -162,7 +181,7 @@ export const StudentDashboard = () => {
         )}
       </div>
 
-      {/* Available Subjects to Request Access */}
+      {/* Otras Materias Disponibles para Solicitar Acceso */}
       {otherSubjects.length > 0 && (
         <div style={{ marginBottom: '2.5rem' }}>
           <div style={{ marginBottom: '1rem' }}>
@@ -193,20 +212,20 @@ export const StudentDashboard = () => {
         </div>
       )}
 
-      {/* Student Shortcuts */}
+      {/* Accesos Rápidos Estudiantiles */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
         <Link to="/estudiante/biblioteca" className="card card-interactive" style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none' }}>
           <div style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--primary-50)', color: 'var(--primary-800)' }}>
             <FolderArchive size={24} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-900)' }}>Biblioteca Escolar</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Descargá apuntes y lecturas publicadas</div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-900)' }}>Biblioteca General</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Leé y descargá documentos en PDF</div>
           </div>
         </Link>
 
         <Link to="/materias-previas" className="card card-interactive" style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none' }}>
-          <div style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--amber-100)', color: 'var(--amber-600)' }}>
+          <div style={{ padding: '0.75rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--amber-100)', color: 'var(--amber-700)' }}>
             <BookmarkCheck size={24} />
           </div>
           <div>
@@ -220,8 +239,8 @@ export const StudentDashboard = () => {
             <Calendar size={24} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-900)' }}>Calendario Académico</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Consultá clases y fechas límite</div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-900)' }}>Calendario Escolar</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Consultá clases y fechas institucionales</div>
           </div>
         </Link>
       </div>

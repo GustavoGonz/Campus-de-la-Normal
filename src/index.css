@@ -4,29 +4,64 @@
    ========================================================================== */
 
 :root {
-  /* Institutional Brand Colors */
-  --primary-900: #0f172a;
-  --primary-800: #1e3a8a; /* Normal Institutional Navy */
-  --primary-700: #1d4ed8;
-  --primary-600: #2563eb;
+  /* ==========================================================================
+     Official Institutional Palette (Extracted directly from Normal Emblem)
+     Escuela Normal Dr. Pedro Ignacio de Castro Barros
+     - Royal Blue (Left Field & Border): #0C13A8
+     - Vivid Orange (Right Field): #FF7B15
+     - Heraldic Gold ("ESCUELA NORMAL"): #E3CB15
+     - White (Open Book & Subtitle): #FFFFFF
+     - Torch Flame: #FF3B30 / #EF4444
+     ========================================================================== */
+  --brand-blue: #0c13a8;
+  --brand-blue-deep: #080e7d;
+  --brand-blue-hover: #1720cc;
+  --brand-blue-light: #eef2ff;
+  --brand-blue-border: #c7d2fe;
+
+  --brand-orange: #ff7b15;
+  --brand-orange-hover: #e66807;
+  --brand-orange-light: #fff7ed;
+  --brand-orange-border: #fed7aa;
+
+  --brand-gold: #e3cb15;
+  --brand-gold-dark: #b89c08;
+  --brand-gold-light: #fefce8;
+
+  --brand-flame: #ef4444;
+  --brand-wood: #8b5a2b;
+
+  /* Institutional Scales */
+  --primary-950: #040742;
+  --primary-900: #080e7d;
+  --primary-850: #0a1188;
+  --primary-800: #0c13a8; /* Main Normal Blue */
+  --primary-700: #1720cc;
+  --primary-600: #2533e8;
   --primary-500: #3b82f6;
-  --primary-100: #dbeafe;
-  --primary-50:  #eff6ff;
+  --primary-200: #c7d2fe;
+  --primary-100: #e0e7ff;
+  --primary-50:  #eef2ff;
 
-  --accent-600: #0284c7; /* Sky accent */
-  --accent-500: #0ea5e9;
-  --accent-100: #e0f2fe;
+  --accent-700: #c25203;
+  --accent-600: #e66807;
+  --accent-500: #ff7b15; /* Main Normal Orange */
+  --accent-200: #fed7aa;
+  --accent-100: #ffedd5;
+  --accent-50:  #fff7ed;
 
-  --amber-600: #d97706; /* Academic Gold */
-  --amber-500: #f59e0b;
+  --amber-600: #b45309;
+  --amber-500: #d97706;
+  --amber-400: #e3cb15;
   --amber-100: #fef3c7;
+  --amber-50:  #fffbeb;
 
-  --success-600: #059669; /* Green */
+  --success-600: #059669;
   --success-500: #10b981;
   --success-100: #d1fae5;
   --success-50:  #ecfdf5;
 
-  --danger-600: #dc2626; /* Crimson */
+  --danger-600: #dc2626;
   --danger-500: #ef4444;
   --danger-100: #fee2e2;
   --danger-50:  #fef2f2;
@@ -177,13 +212,13 @@ a:hover {
 }
 
 .btn-primary {
-  background-color: var(--primary-800);
+  background-color: var(--brand-blue);
   color: #ffffff;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: var(--primary-700);
-  box-shadow: 0 4px 10px rgba(30, 58, 138, 0.25);
+  background-color: var(--brand-blue-hover);
+  box-shadow: 0 4px 14px rgba(12, 19, 168, 0.32);
 }
 
 .btn-secondary {
@@ -193,17 +228,19 @@ a:hover {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: var(--bg-muted);
-  border-color: var(--primary-500);
+  background-color: var(--brand-blue-light);
+  border-color: var(--brand-blue);
+  color: var(--brand-blue);
 }
 
 .btn-accent {
-  background-color: var(--accent-600);
+  background-color: var(--brand-orange);
   color: #ffffff;
 }
 
 .btn-accent:hover:not(:disabled) {
-  background-color: var(--accent-500);
+  background-color: var(--brand-orange-hover);
+  box-shadow: 0 4px 14px rgba(255, 123, 21, 0.35);
 }
 
 .btn-success {
@@ -478,4 +515,89 @@ a:hover {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+/* ==========================================================================
+   Campus: La Normal - Institutional Identity Classes & Responsive Rules
+   ========================================================================== */
+
+.institutional-banner {
+  background: linear-gradient(135deg, var(--brand-blue-deep) 0%, var(--brand-blue) 65%, #1e2bcc 100%);
+  color: #ffffff;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 25px -5px rgba(12, 19, 168, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.institutional-banner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 140px;
+  height: 100%;
+  background: radial-gradient(circle at 100% 50%, rgba(255, 123, 21, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.badge-institutional {
+  background-color: var(--brand-blue-light);
+  color: var(--brand-blue);
+  border: 1px solid var(--brand-blue-border);
+}
+
+.badge-orange {
+  background-color: var(--brand-orange-light);
+  color: var(--brand-orange-hover);
+  border: 1px solid var(--brand-orange-border);
+}
+
+.badge-gold {
+  background-color: var(--brand-gold-light);
+  color: var(--brand-gold-dark);
+  border: 1px solid #fef08a;
+}
+
+/* Responsive adjustments for Logo in Navigation & Header */
+@media (max-width: 640px) {
+  .institutional-slogan {
+    display: none !important;
+  }
+  .institutional-subtitle {
+    display: none !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .header-nav {
+    padding: 0 0.85rem;
+  }
+}
+
+/* Dark Mode & High Contrast Compatibility */
+[data-theme='dark'], .theme-dark {
+  --bg-page: #070b1a;
+  --bg-surface: #0c142b;
+  --bg-surface-elevated: #111b38;
+  --bg-muted: #162244;
+  --bg-input: #0f1933;
+
+  --text-main: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+
+  --border-light: #1e293b;
+  --border-medium: #334155;
+  --border-focus: var(--brand-blue-hover);
+}
+
+/* Ensure Logo visibility in dark mode via luminous halo */
+[data-theme='dark'] .institutional-logo-symbol img,
+[data-theme='dark'] .institutional-logo-horizontal img,
+[data-theme='dark'] .institutional-logo-vertical img,
+.theme-dark .institutional-logo-symbol img,
+.theme-dark .institutional-logo-horizontal img,
+.theme-dark .institutional-logo-vertical img {
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 3px 8px rgba(0, 0, 0, 0.6)) !important;
 }

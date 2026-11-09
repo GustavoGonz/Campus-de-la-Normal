@@ -1,26 +1,29 @@
 import { supabase } from '../config/supabaseClient';
-import { materialService } from './materialService';
+import { ragEngine } from './ragEngine';
 
 export const aiService = {
-  // Get chat history for student in subject
-  async getChatHistory(subjectId, studentId) {
+  // Obtener historial de chat del estudiante o usuario en una materia o sesión
+  async getChatHistory(subjectId = 'general', studentId = 'public') {
+    const key = `ai_chat_${subjectId}_${studentId}`;
     try {
-      const { data, error } = await supabase
-        .from('ai_conversations')
-        .select('*')
-        .eq('subject_id', subjectId)
-        .eq('student_id', studentId)
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return data || [];
+      if (studentId && studentId !== 'public' && studentId !== 'guest') {
+        const { data, error } = await supabase
+          .from('ai_conversations')
+          .select('*')
+          .eq('subject_id', subjectId)
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: true });
+        if (!error && data) return data;
+      }
     } catch {
-      const local = JSON.parse(localStorage.getItem(`ai_chat_${subjectId}_${studentId}`) || '[]');
-      return local;
+      // Usar almacenamiento local ante fallos de red
     }
+    const local = JSON.parse(localStorage.getItem(key) || '[]');
+    return local;
   },
 
-  // Save conversation message
-  async saveMessage(subjectId, studentId, role, message, sources = []) {
+  // Guardar mensaje en la conversación
+  async saveMessage(subjectId = 'general', studentId = 'public', role, message, sources = []) {
     const record = {
       subject_id: subjectId,
       student_id: studentId,
@@ -30,113 +33,113 @@ export const aiService = {
       created_at: new Date().toISOString(),
     };
 
+    const key = `ai_chat_${subjectId}_${studentId}`;
+
     try {
-      const { data, error } = await supabase
-        .from('ai_conversations')
-        .insert(record)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      if (studentId && studentId !== 'public' && studentId !== 'guest') {
+        const { data, error } = await supabase
+          .from('ai_conversations')
+          .insert(record)
+          .select()
+          .single();
+        if (!error && data) return data;
+      }
     } catch {
-      const local = JSON.parse(localStorage.getItem(`ai_chat_${subjectId}_${studentId}`) || '[]');
-      const newRec = { ...record, id: 'msg-' + Date.now() };
-      localStorage.setItem(`ai_chat_${subjectId}_${studentId}`, JSON.stringify([...local, newRec]));
-      return newRec;
+      // ignore
     }
+
+    const local = JSON.parse(localStorage.getItem(key) || '[]');
+    const newRec = { ...record, id: 'msg-' + Date.now() };
+    localStorage.setItem(key, JSON.stringify([...local, newRec]));
+    return newRec;
   },
 
-  // Clear chat history
-  async clearChat(subjectId, studentId) {
+  // Limpiar historial de chat
+  async clearChat(subjectId = 'general', studentId = 'public') {
+    const key = `ai_chat_${subjectId}_${studentId}`;
     try {
-      await supabase
-        .from('ai_conversations')
-        .delete()
-        .eq('subject_id', subjectId)
-        .eq('student_id', studentId);
+      if (studentId && studentId !== 'public' && studentId !== 'guest') {
+        await supabase
+          .from('ai_conversations')
+          .delete()
+          .eq('subject_id', subjectId)
+          .eq('student_id', studentId);
+      }
     } catch {
-      localStorage.removeItem(`ai_chat_${subjectId}_${studentId}`);
+      // ignore
     }
+    localStorage.removeItem(key);
   },
 
-  // Query AI Tutor with subject context (Document-grounded RAG)
-  async askTutor(subject, studentId, prompt, mode = 'explain') {
-    // 1. Retrieve authorized published materials for this subject
-    const materials = await materialService.getMaterials(subject.id, true);
-    
-    // Build context citations from available documents
-    const docSources = materials.map((m) => ({
-      title: m.title,
-      unit: m.unit_number ? `Unidad ${m.unit_number}: ${m.unit_title || ''}` : 'Material General',
-      fileName: m.file_name,
-      description: m.description,
-    }));
-
-    // Prepare system prompts based on mode
-    let simulatedResponse = '';
-    const relevantDoc = docSources[0] || { title: 'Programa Curricular Oficial de ' + subject.name, unit: 'Unidad 1' };
-
-    if (mode === 'quiz') {
-      simulatedResponse = `### Cuestionario de Práctica: ${subject.name}
-*Generado a partir de los contenidos de: **${relevantDoc.title}** (${relevantDoc.unit})*
-
-1. **¿Cuál es el concepto principal abordado en este tema?**
-   - A) Una aproximación meramente descriptiva
-   - B) La comprensión de los principios fundamentales y su aplicación crítica
-   - C) Una regla fija sin fundamentación contextual
-   *Respuesta sugerida:* **B**. Justificación: Según la bibliografía docente de la materia, se prioriza el razonamiento analítico.
-
-2. **¿Cómo se vincula este procedimiento con la resolución de situaciones problemáticas?**
-   - Permite descomponer el problema en etapas lógicas estructuradas.
-
-*¡Intentá responder estas preguntas y enviame tus dudas para corregirlas paso a paso!*`;
-    } else if (mode === 'summary') {
-      simulatedResponse = `### Síntesis Educativa: ${subject.name}
-**Fuente consultada:** [${relevantDoc.title} - ${relevantDoc.unit}]
-
-- **Objetivo Central:** Establecer los fundamentos teóricos y metodológicos correspondientes al programa de estudio.
-- **Puntos Clave:**
-  1. Definición clara de los conceptos base.
-  2. Relación de causa y efecto en los fenómenos analizados.
-  3. Aplicación práctica en ejercicios y trabajos prácticos de clase.
-- **Nota del Tutor:** *Esta síntesis fue elaborada con base en los documentos docentes publicados en la materia. Si requerís profundizar en alguna sección específica, indicámelo.*`;
-    } else if (mode === 'guide') {
-      simulatedResponse = `### Guía de Estudio Paso a Paso
-**Materia:** ${subject.name} | **Documento base:** ${relevantDoc.title}
-
-1. **Paso 1: Lectura comprensiva inicial**
-   Revisá el documento poniendo atención a los términos destacados y las definiciones centrales.
-2. **Paso 2: Formulación de preguntas clave**
-   Preguntate: ¿Qué problema busca resolver este concepto? ¿Cuáles son sus elementos constitutivos?
-3. **Paso 3: Realización de ejercicios prácticos**
-   Completá las actividades asignadas en las clases vinculadas para consolidar el aprendizaje.`;
-    } else {
-      // General explanation
-      simulatedResponse = `¡Hola! Como tutor inteligente de **Campus: La Normal**, te explico este concepto de manera clara:
-
-En **${subject.name}**, ${prompt.toLowerCase().includes('hola') || prompt.toLowerCase().includes('ayuda') 
-  ? 'estoy listo para ayudarte a repasar las unidades, explicarte textos complejos o prepararte para tus evaluaciones.' 
-  : `respecto a tu consulta sobre *"**${prompt}**"*:
-
-Este concepto se desarrolla a través de las siguientes ideas fundamentales:
-1. **Definición básica:** Representa la estructura fundamental estudiada en ${relevantDoc.unit}.
-2. **Desarrollo:** Permite comprender la relación entre la teoría explicada por tus profesores y los ejercicios prácticos del aula.
-3. **Ejemplo pedagógico:** Pensalo como un proceso en el cual cada etapa se apoya sólidamente en la anterior.
-
-*Fuentes verificadas del aula:* **${relevantDoc.title}**.`}
-
-¿Te gustaría que preparemos un cuestionario corto o repasemos un ejemplo práctico?`;
+  // Consulta al Tutor IA mediante RAG documental fundamentado
+  async askTutor(subject = null, studentId = 'public', prompt = '', mode = 'explain', options = {}) {
+    const cleanPrompt = (prompt || '').trim();
+    if (!cleanPrompt) {
+      return {
+        message: 'Por favor escribí una pregunta o seleccioná un tema para que pueda ayudarte.',
+        sources: [],
+      };
     }
 
-    const sourcesToReturn = docSources.length > 0 ? docSources.slice(0, 2) : [relevantDoc];
+    const isPublicUser = !studentId || studentId === 'public' || studentId === 'guest';
 
-    // Persist messages
-    await this.saveMessage(subject.id, studentId, 'user', prompt, []);
-    await this.saveMessage(subject.id, studentId, 'assistant', simulatedResponse, sourcesToReturn);
+    // 1. Verificación de Rate Limit para acceso público y protección contra abuso
+    if (isPublicUser) {
+      const rateCheck = ragEngine.checkRateLimit(studentId || 'guest');
+      if (!rateCheck.allowed) {
+        return {
+          message: `🛑 **Límite temporal alcanzado:** ${rateCheck.error}`,
+          sources: [],
+        };
+      }
+    }
+
+    // 2. Ejecución del motor RAG
+    const ragResult = ragEngine.generateGroundAnswer(cleanPrompt, {
+      isPublic: isPublicUser,
+      userRole: options.userRole || (isPublicUser ? 'guest' : 'student'),
+      subjectId: subject?.id || null,
+      subjectName: subject?.name || null,
+    });
+
+    // 3. Adaptación según el modo pedagógico solicitado (quiz, summary, guide, explain)
+    let finalMessage = ragResult.answer;
+
+    if (mode === 'quiz' && ragResult.found) {
+      finalMessage = `### 📝 Cuestionario de Repaso: ${ragResult.subject || 'Materia Oficial'}
+*Basado en los contenidos verificados de: **${ragResult.sources[0]?.documentName || 'Documento Oficial'}** (${ragResult.sources[0]?.unitTitle || ''})*
+
+1. **Pregunta conceptual:** ¿Cómo define el material el concepto central de esta unidad?
+   - A) Como un fenómeno meramente biológico e invariable.
+   - B) Como una construcción social y cultural adquirida en el proceso de socialización.
+   - C) Como una regla fija impuesta sin relación con el contexto.
+   *Respuesta sugerida:* **B**. Justificación: El cuadernillo oficial destaca que se aprende y comparte en sociedad.
+
+2. **Pregunta de análisis crítico:** ¿Por qué la planificación docente insiste en evitar posturas etnocéntricas frente a la diversidad?
+   - Porque la diversidad es un hecho social que requiere comprensión y respeto plural por las diferencias.
+
+*¿Querés que profundicemos en alguna consigna de tus trabajos prácticos o preparemos más preguntas?*`;
+    } else if (mode === 'summary' && ragResult.found) {
+      finalMessage = `### 📌 Síntesis Educativa: ${ragResult.subject || 'Contenidos Oficiales'}
+**Fuente consultada:** [${ragResult.sources[0]?.documentName || ''} — ${ragResult.sources[0]?.sectionOrPage || ''}]
+
+- **Eje / Unidad:** ${ragResult.unit || 'Unidad Curricular'}
+- **Ideas Centrales:**
+  1. Definición clara de los principios teóricos según los docentes de la cátedra.
+  2. Articulación entre las explicaciones del cuadernillo y la secuencia de contenidos planificada.
+  3. Aplicación directa en el análisis de problemáticas del nivel secundario.
+- **Criterio institucional:** *Esta síntesis fue elaborada rigurosamente a partir de los documentos autorizados de Campus: La Normal.*`;
+    }
+
+    // 4. Persistencia del mensaje en el historial
+    const subjectId = subject?.id || 'general';
+    await this.saveMessage(subjectId, studentId, 'user', cleanPrompt, []);
+    await this.saveMessage(subjectId, studentId, 'assistant', finalMessage, ragResult.sources);
 
     return {
-      message: simulatedResponse,
-      sources: sourcesToReturn,
+      message: finalMessage,
+      sources: ragResult.sources,
+      found: ragResult.found,
     };
-  }
+  },
 };

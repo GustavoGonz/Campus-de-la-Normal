@@ -1,13 +1,19 @@
 import { supabase } from '../config/supabaseClient';
 
+const withTimeout = (promise, ms = 2000) => {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Query timeout')), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+};
+
 export const subjectService = {
   // Get all courses and divisions
   async getCourses() {
     try {
-      const { data, error } = await supabase
-        .from('courses')
-        .select('*')
-        .order('name');
+      const query = supabase.from('courses').select('*').order('name');
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return data || [];
     } catch {
@@ -19,6 +25,7 @@ export const subjectService = {
         { id: 'c4', name: '3° Año', division: '1° División', shift: 'Mañana', year: 2026 },
         { id: 'c5', name: '4° Año', division: 'U', shift: 'Mañana', year: 2026 },
         { id: 'c6', name: '5° Año', division: 'U', shift: 'Mañana', year: 2026 },
+        { id: 'c7', name: '5° Año', division: '5° “B” y “F”', shift: 'Mañana y Tarde', year: 2026 },
       ];
     }
   },
@@ -26,14 +33,11 @@ export const subjectService = {
   // Create Course
   async createCourse(courseData) {
     try {
-      const { data, error } = await supabase
-        .from('courses')
-        .insert(courseData)
-        .select()
-        .single();
+      const query = supabase.from('courses').insert(courseData).select().single();
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return data;
-    } catch (err) {
+    } catch {
       const courses = await this.getCourses();
       const newCourse = { ...courseData, id: 'c-' + Date.now() };
       localStorage.setItem('campus_courses', JSON.stringify([...courses, newCourse]));
@@ -44,26 +48,40 @@ export const subjectService = {
   // Get all subjects
   async getSubjects() {
     try {
-      const { data, error } = await supabase
-        .from('subjects')
-        .select(`
-          *,
-          courses (id, name, division, shift),
-          subject_teachers (
-            teacher_id,
-            profiles:teacher_id (id, full_name, email)
-          )
-        `)
-        .order('name');
+      const query = supabase.from('subjects').select(`
+        *,
+        courses (id, name, division, shift),
+        subject_teachers (
+          teacher_id,
+          profiles:teacher_id (id, full_name, email)
+        )
+      `).order('name');
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       if (data && data.length > 0) return data;
-      throw new Error('Empty subjects, load institutional defaults');
+      throw new Error('Empty remote subjects');
     } catch {
       const local = localStorage.getItem('campus_subjects');
       if (local) return JSON.parse(local);
 
-      // Default institutional subjects for Escuela Normal Superior
+      // Espacios curriculares oficiales de la Escuela Normal Superior
       const defaultSubjects = [
+        {
+          id: 'sub-antrop-5',
+          name: 'Antropología',
+          code: 'ANT-501',
+          description: 'Origen del hombre, teorías de la cultura, diversidad humana y configuraciones familiares.',
+          color: '#0284c7',
+          status: 'active',
+          access_type: 'open',
+          is_public: true,
+          course_id: 'c7',
+          courses: { id: 'c7', name: '5° Año', division: '5° “B” y “F”' },
+          syllabus: [
+            { unit: 1, title: 'EJE N° 1: La Antropología como disciplina científica', description: 'Definición, ramas, Claude Lévi-Strauss y métodos de investigación.' },
+            { unit: 2, title: 'EJE N° 2: La Cultura como modo de explicación de la diversidad humana', description: 'Características de la cultura, UNESCO, configuraciones familiares y alimentación.' }
+          ]
+        },
         {
           id: 'sub-lengua-1',
           name: 'Lengua y Literatura I',
@@ -141,44 +159,70 @@ export const subjectService = {
   // Get subjects assigned to a teacher
   async getTeacherSubjects(teacherId) {
     const all = await this.getSubjects();
-    // For demo/admin users, return all subjects. Otherwise return assigned or all if teacher
     return all;
   },
 
   // Get subjects where student is enrolled
   async getStudentSubjects(studentId) {
+    if (!studentId || studentId.startsWith('guest') || studentId === 'public') {
+      return [];
+    }
+
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('subject_students')
         .select('subject_id, status, subjects (*, courses (*))')
         .eq('student_id', studentId)
         .eq('status', 'active');
+      const { data, error } = await withTimeout(query);
 
       if (!error && data && data.length > 0) {
         return data.map((d) => d.subjects);
       }
-      throw new Error('Use local');
     } catch {
-      const enrollments = JSON.parse(localStorage.getItem(`enroll_${studentId}`) || '[]');
-      const all = await this.getSubjects();
-      if (enrollments.length > 0) {
-        return all.filter((s) => enrollments.includes(s.id));
-      }
-      // Give initial enrollment to first 2 subjects for demonstration
-      return all.slice(0, 2);
+      // Fallback
     }
+
+    const enrollments = JSON.parse(localStorage.getItem(`enroll_${studentId}`) || '[]');
+    const all = await this.getSubjects();
+    if (enrollments.length > 0) {
+      return all.filter((s) => enrollments.includes(s.id));
+    }
+    // Si no está explícitamente matriculado y no es invitado, no inventar matrícula
+    return [];
   },
 
   // Check enrollment status
   async checkEnrollment(subjectId, studentId) {
+    if (!studentId || studentId.startsWith('guest') || studentId === 'public') {
+      return false;
+    }
     const enrolled = await this.getStudentSubjects(studentId);
     return enrolled.some((s) => s.id === subjectId);
+  },
+
+  // Enroll student directly (e.g. by admin or initial matriculation)
+  async enrollStudent(subjectId, studentId) {
+    try {
+      const query = supabase
+        .from('subject_students')
+        .insert({ subject_id: subjectId, student_id: studentId, status: 'active' })
+        .select()
+        .single();
+      await withTimeout(query);
+    } catch {
+      const enrollments = JSON.parse(localStorage.getItem(`enroll_${studentId}`) || '[]');
+      if (!enrollments.includes(subjectId)) {
+        localStorage.setItem(`enroll_${studentId}`, JSON.stringify([...enrollments, subjectId]));
+      }
+    }
+    return true;
   },
 
   // Request access to a subject
   async requestAccess(subjectId, studentId, message = '') {
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('access_requests')
         .insert({
           subject_id: subjectId,
@@ -188,7 +232,7 @@ export const subjectService = {
         })
         .select()
         .single();
-
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return { success: true, data };
     } catch {
@@ -218,113 +262,50 @@ export const subjectService = {
         .select(`
           *,
           subjects (id, name, code),
-          profiles:student_id (id, full_name, email)
+          profiles:student_id (id, full_name, email, role)
         `)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
 
       if (subjectId) {
         query = query.eq('subject_id', subjectId);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return data || [];
     } catch {
-      const existing = JSON.parse(localStorage.getItem('campus_access_requests') || '[]');
-      if (subjectId) {
-        return existing.filter((r) => r.subject_id === subjectId && r.status === 'pending');
-      }
-      return existing.filter((r) => r.status === 'pending');
+      const local = JSON.parse(localStorage.getItem('campus_access_requests') || '[]');
+      return local.filter((r) => r.status === 'pending');
     }
   },
 
-  // Review access request (approve / reject)
-  async reviewAccessRequest(requestId, status, reviewerId, note = '') {
+  // Review access request (Approve/Reject)
+  async reviewAccessRequest(requestId, status, responseNote = '', reviewerId = null) {
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('access_requests')
         .update({
           status,
+          response_note: responseNote,
           reviewed_by: reviewerId,
           reviewed_at: new Date().toISOString(),
-          response_note: note,
         })
         .eq('id', requestId)
         .select()
         .single();
-
-      if (error) throw error;
-
-      if (status === 'approved' && data) {
-        await supabase.from('subject_students').insert({
-          subject_id: data.subject_id,
-          student_id: data.student_id,
-          status: 'active',
-        });
-      }
-
-      return { success: true, data };
-    } catch {
-      const existing = JSON.parse(localStorage.getItem('campus_access_requests') || '[]');
-      let updatedReq = null;
-      const updatedList = existing.map((r) => {
-        if (r.id === requestId) {
-          updatedReq = { ...r, status, reviewed_by: reviewerId, reviewed_at: new Date().toISOString(), response_note: note };
-          return updatedReq;
-        }
-        return r;
-      });
-      localStorage.setItem('campus_access_requests', JSON.stringify(updatedList));
-
-      if (status === 'approved' && updatedReq) {
-        const studentEnrollments = JSON.parse(localStorage.getItem(`enroll_${updatedReq.student_id}`) || '[]');
-        if (!studentEnrollments.includes(updatedReq.subject_id)) {
-          localStorage.setItem(`enroll_${updatedReq.student_id}`, JSON.stringify([...studentEnrollments, updatedReq.subject_id]));
-        }
-      }
-
-      return { success: true, data: updatedReq };
-    }
-  },
-
-  // Create Subject (Admin)
-  async createSubject(subjectData) {
-    try {
-      const { data, error } = await supabase
-        .from('subjects')
-        .insert(subjectData)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    } catch (err) {
-      const all = await this.getSubjects();
-      const newSub = {
-        ...subjectData,
-        id: 'sub-' + Date.now(),
-        syllabus: subjectData.syllabus || [],
-      };
-      localStorage.setItem('campus_subjects', JSON.stringify([...all, newSub]));
-      return newSub;
-    }
-  },
-
-  // Update Subject
-  async updateSubject(subjectId, updates) {
-    try {
-      const { data, error } = await supabase
-        .from('subjects')
-        .update(updates)
-        .eq('id', subjectId)
-        .select()
-        .single();
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return data;
     } catch {
-      const all = await this.getSubjects();
-      const updated = all.map((s) => (s.id === subjectId ? { ...s, ...updates } : s));
-      localStorage.setItem('campus_subjects', JSON.stringify(updated));
-      return updated.find((s) => s.id === subjectId);
+      const list = JSON.parse(localStorage.getItem('campus_access_requests') || '[]');
+      const updated = list.map((r) =>
+        r.id === requestId
+          ? { ...r, status, response_note: responseNote, reviewed_at: new Date().toISOString() }
+          : r
+      );
+      localStorage.setItem('campus_access_requests', JSON.stringify(updated));
+      return updated.find((r) => r.id === requestId);
     }
   }
 };

@@ -3,26 +3,24 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { subjectService } from '../../services/subjectService';
 import { classService } from '../../services/classService';
-import { activityService } from '../../services/activityService';
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
   ChevronRight, 
   BookOpen, 
-  CheckSquare, 
   Clock, 
   Filter 
 } from 'lucide-react';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
 export const CalendarPage = () => {
-  const { user, isTeacher } = useAuth();
+  const { user, isTeacher, isGuest, isAdmin } = useAuth();
   const [subjects, setSubjects] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('all');
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Calendar View: 'month', 'week', 'day'
+  // Vistas: 'month', 'week', 'day'
   const [currentView, setCurrentView] = useState('month');
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -30,15 +28,19 @@ export const CalendarPage = () => {
     const loadEvents = async () => {
       setLoading(true);
       try {
-        const subs = isTeacher
-          ? await subjectService.getTeacherSubjects(user?.id)
-          : await subjectService.getStudentSubjects(user?.id);
+        let subs = [];
+        if (isAdmin || isGuest) {
+          subs = await subjectService.getSubjects();
+        } else if (isTeacher) {
+          subs = await subjectService.getTeacherSubjects(user?.id);
+        } else {
+          subs = await subjectService.getStudentSubjects(user?.id);
+        }
         setSubjects(subs);
 
         const allEvents = [];
         for (const sub of subs) {
-          // Fetch classes
-          const classes = await classService.getClasses(sub.id, !isTeacher);
+          const classes = await classService.getClasses(sub.id, !isTeacher && !isAdmin);
           classes.forEach((c) => {
             allEvents.push({
               id: c.id,
@@ -51,35 +53,18 @@ export const CalendarPage = () => {
               link: isTeacher ? `/profesor/materia/${sub.id}` : `/estudiante/materia/${sub.id}`,
             });
           });
-
-          // Fetch activities
-          const activities = await activityService.getActivities(sub.id, !isTeacher);
-          activities.forEach((a) => {
-            if (a.due_date) {
-              allEvents.push({
-                id: a.id,
-                type: 'activity',
-                title: a.title,
-                date: a.due_date.split('T')[0],
-                subjectName: sub.name,
-                subjectId: sub.id,
-                detail: `Fecha límite de entrega`,
-                link: isTeacher ? `/profesor/materia/${sub.id}` : `/estudiante/materia/${sub.id}`,
-              });
-            }
-          });
         }
 
         setEvents(allEvents);
       } catch (err) {
-        console.error('Calendar error:', err);
+        console.error('Error cargando calendario escolar:', err);
       } finally {
         setLoading(false);
       }
     };
 
     loadEvents();
-  }, [user, isTeacher]);
+  }, [user, isTeacher, isGuest, isAdmin]);
 
   const nextPeriod = () => {
     const next = new Date(currentDate);
@@ -101,45 +86,31 @@ export const CalendarPage = () => {
     setCurrentDate(new Date());
   };
 
-  if (loading) return <LoadingSpinner text="Organizando calendario académico..." />;
-
-  const filteredEvents = events.filter((e) => {
-    return selectedSubjectId === 'all' || e.subjectId === selectedSubjectId;
-  });
-
-  // Month grid calculation
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const firstDay = new Date(year, month, 1).getDay(); // 0 is Sunday
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  const monthNames = [
+  const months = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
+  if (loading) return <LoadingSpinner text="Cargando calendario escolar..." />;
+
+  const filteredEvents = events.filter((ev) => {
+    return selectedSubjectId === 'all' || ev.subjectId === selectedSubjectId;
+  });
+
   return (
     <div>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        marginBottom: '1.5rem',
-      }}>
+      {/* Cabecera del Calendario */}
+      <div style={{ marginBottom: '1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.85rem', color: 'var(--primary-900)', marginBottom: '0.4rem' }}>
-            Calendario Académico Integrado
+          <h1 style={{ fontSize: '1.85rem', color: 'var(--primary-900)', marginBottom: '0.4rem', fontFamily: 'var(--font-display)' }}>
+            Calendario y Cronograma Escolar
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-            Clases dictadas, actividades prácticas y fechas límites de entrega de tus materias.
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0 }}>
+            Escuela Normal Dr. Pedro Ignacio de Castro Barros • Ciclo Lectivo 2026.
           </p>
         </div>
 
-        {/* View Switcher */}
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        {subjects.length > 0 && !isGuest && (
           <select
             className="form-select"
             style={{ width: 'auto' }}
@@ -151,204 +122,90 @@ export const CalendarPage = () => {
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
-
-          <div style={{ display: 'flex', backgroundColor: 'var(--bg-muted)', borderRadius: 'var(--radius-sm)', padding: '0.2rem', border: '1px solid var(--border-light)' }}>
-            <button
-              onClick={() => setCurrentView('month')}
-              className="btn btn-sm"
-              style={{
-                backgroundColor: currentView === 'month' ? 'var(--primary-800)' : 'transparent',
-                color: currentView === 'month' ? '#fff' : 'var(--text-secondary)',
-                border: 'none',
-              }}
-            >
-              Mes
-            </button>
-            <button
-              onClick={() => setCurrentView('week')}
-              className="btn btn-sm"
-              style={{
-                backgroundColor: currentView === 'week' ? 'var(--primary-800)' : 'transparent',
-                color: currentView === 'week' ? '#fff' : 'var(--text-secondary)',
-                border: 'none',
-              }}
-            >
-              Semana
-            </button>
-            <button
-              onClick={() => setCurrentView('day')}
-              className="btn btn-sm"
-              style={{
-                backgroundColor: currentView === 'day' ? 'var(--primary-800)' : 'transparent',
-                color: currentView === 'day' ? '#fff' : 'var(--text-secondary)',
-                border: 'none',
-              }}
-            >
-              Día
-            </button>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Navigation Bar */}
+      {/* Controles de Navegación del Calendario */}
       <div style={{
+        backgroundColor: 'var(--bg-surface)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--border-light)',
+        padding: '1rem 1.25rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'var(--bg-surface)',
-        padding: '0.75rem 1.25rem',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--border-light)',
-        marginBottom: '1rem',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        marginBottom: '1.5rem',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button onClick={prevPeriod} className="btn btn-ghost btn-sm" style={{ padding: '0.3rem' }}>
-            <ChevronLeft size={20} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button onClick={prevPeriod} className="btn btn-secondary btn-sm" aria-label="Mes anterior">
+            <ChevronLeft size={16} />
           </button>
           <button onClick={todayPeriod} className="btn btn-secondary btn-sm">
             Hoy
           </button>
-          <button onClick={nextPeriod} className="btn btn-ghost btn-sm" style={{ padding: '0.3rem' }}>
-            <ChevronRight size={20} />
+          <button onClick={nextPeriod} className="btn btn-secondary btn-sm" aria-label="Mes siguiente">
+            <ChevronRight size={16} />
           </button>
-        </div>
-
-        <h3 style={{ fontSize: '1.25rem', color: 'var(--primary-900)', margin: 0 }}>
-          {monthNames[month]} {year}
-        </h3>
-
-        <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.8rem', fontWeight: 600 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--primary-600)' }} />
-            Clases
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--amber-500)' }} />
-            Vencimiento Tareas
+          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--primary-900)', marginLeft: '0.5rem' }}>
+            {months[currentDate.getMonth()]} {currentDate.getFullYear()}
           </span>
         </div>
       </div>
 
-      {/* Month View Grid */}
-      {currentView === 'month' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          {/* Weekday headers */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            backgroundColor: 'var(--bg-muted)',
-            borderBottom: '1px solid var(--border-light)',
-            textAlign: 'center',
-            fontWeight: 700,
-            fontSize: '0.8rem',
-            color: 'var(--text-secondary)',
-            padding: '0.6rem 0',
-          }}>
-            <div>DOM</div>
-            <div>LUN</div>
-            <div>MAR</div>
-            <div>MIÉ</div>
-            <div>JUE</div>
-            <div>VIE</div>
-            <div>SÁB</div>
+      {/* Listado de Clases y Cronograma del Período */}
+      <div className="card">
+        <h3 style={{ fontSize: '1.2rem', color: 'var(--primary-900)', marginBottom: '1rem' }}>
+          Clases y Novedades Programadas ({filteredEvents.length})
+        </h3>
+
+        {filteredEvents.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            No hay clases programadas para el período seleccionado.
           </div>
-
-          {/* Days */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', minHeight: '480px' }}>
-            {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`empty-${i}`} style={{ backgroundColor: 'var(--bg-page)', borderRight: '1px solid var(--border-light)', borderBottom: '1px solid var(--border-light)', opacity: 0.4 }} />
-            ))}
-
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const dayNum = i + 1;
-              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-              const dayEvents = filteredEvents.filter((e) => e.date === dateStr);
-              const isToday = new Date().toDateString() === new Date(year, month, dayNum).toDateString();
-
-              return (
-                <div
-                  key={`day-${dayNum}`}
-                  style={{
-                    minHeight: '90px',
-                    padding: '0.4rem',
-                    borderRight: '1px solid var(--border-light)',
-                    borderBottom: '1px solid var(--border-light)',
-                    backgroundColor: isToday ? 'var(--primary-50)' : 'var(--bg-surface)',
-                  }}
-                >
-                  <div style={{
-                    fontSize: '0.8rem',
-                    fontWeight: isToday ? 800 : 600,
-                    color: isToday ? 'var(--primary-800)' : 'var(--text-secondary)',
-                    marginBottom: '0.25rem',
-                  }}>
-                    {dayNum}
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {filteredEvents.map((ev) => (
+              <div
+                key={ev.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0.85rem 1.15rem',
+                  backgroundColor: 'var(--bg-muted)',
+                  borderRadius: 'var(--radius-sm)',
+                  borderLeft: '4px solid var(--primary-700)',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                    <span className="badge badge-primary">{ev.date}</span>
+                    <span className="badge badge-neutral">{ev.subjectName}</span>
                   </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    {dayEvents.map((ev) => (
-                      <Link
-                        key={`${ev.type}-${ev.id}`}
-                        to={ev.link}
-                        style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 600,
-                          padding: '0.2rem 0.4rem',
-                          borderRadius: 'var(--radius-xs)',
-                          backgroundColor: ev.type === 'class' ? 'var(--primary-100)' : 'var(--amber-100)',
-                          color: ev.type === 'class' ? 'var(--primary-900)' : 'var(--amber-600)',
-                          textDecoration: 'none',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: 'block',
-                        }}
-                        title={`${ev.title} (${ev.subjectName})`}
-                      >
-                        {ev.type === 'class' ? '📚' : '📌'} {ev.title}
-                      </Link>
-                    ))}
+                  <div style={{ fontWeight: 700, color: 'var(--primary-900)', fontSize: '1rem' }}>
+                    {ev.title}
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Week / Day list representation */}
-      {(currentView === 'week' || currentView === 'day') && (
-        <div className="card">
-          <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--primary-900)' }}>
-            Eventos y Actividades para este período
-          </h4>
-          {filteredEvents.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              No se registran eventos de clases o actividades con fecha en este período.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {filteredEvents.map((ev) => (
-                <div key={`${ev.type}-${ev.id}`} style={{ padding: '0.85rem', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                      <span className={`badge ${ev.type === 'class' ? 'badge-primary' : 'badge-warning'}`}>
-                        {ev.type === 'class' ? 'Clase' : 'Fecha de Entrega'}
-                      </span>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{ev.date}</span>
+                  {ev.detail && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                      {ev.detail}
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{ev.title}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{ev.subjectName}</div>
-                  </div>
-                  <Link to={ev.link} className="btn btn-secondary btn-sm">
-                    Ver en Aula
-                  </Link>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+
+                {!isGuest && (
+                  <Link to={ev.link} className="btn btn-secondary btn-sm">
+                    Ver Clase
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

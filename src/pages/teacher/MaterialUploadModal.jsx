@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../../components/common/Modal';
 import { materialService } from '../../services/materialService';
 import { storageService } from '../../services/storageService';
-import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, FileCheck } from 'lucide-react';
 
 export const MaterialUploadModal = ({
   isOpen,
@@ -13,76 +13,75 @@ export const MaterialUploadModal = ({
   units = [],
   onUploaded,
 }) => {
-  const [files, setFiles] = useState([]);
+  const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [folderId, setFolderId] = useState('');
   const [unitNumber, setUnitNumber] = useState('');
   const [publicationStatus, setPublicationStatus] = useState('published');
+  const [isPublic, setIsPublic] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [progress, setProgress] = useState(0);
 
   const handleFileSelect = (e) => {
-    const selected = Array.from(e.target.files);
+    const selected = e.target.files ? e.target.files[0] : null;
     setErrorMsg('');
 
-    // Validate each file
-    for (const file of selected) {
-      const val = storageService.validateFile(file);
-      if (!val.valid) {
-        setErrorMsg(val.error);
-        return;
-      }
+    if (!selected) return;
+
+    // Validación estricta de PDF
+    const val = storageService.validateFile(selected);
+    if (!val.valid) {
+      setErrorMsg(val.error);
+      setFile(null);
+      return;
     }
 
-    setFiles(selected);
-    if (selected.length === 1 && !title) {
-      setTitle(selected[0].name.replace(/\.[^/.]+$/, ''));
+    setFile(selected);
+    if (!title) {
+      setTitle(selected.name.replace(/\.[^/.]+$/, ''));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (files.length === 0) {
-      setErrorMsg('Por favor seleccioná al menos un archivo para subir.');
+    if (!file) {
+      setErrorMsg('Por favor seleccioná un archivo PDF para subir a la biblioteca.');
       return;
     }
 
     setUploading(true);
     setErrorMsg('');
-    setProgress(20);
+    setProgress(30);
 
     try {
       const selectedUnitObj = units.find((u) => u.unit === parseInt(unitNumber));
 
-      // Upload each file
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const docTitle = files.length === 1 ? title : file.name.replace(/\.[^/.]+$/, '');
+      setProgress(60);
+      await materialService.uploadMaterial(subjectId, teacherId, file, {
+        title: title.trim() || file.name.replace(/\.[^/.]+$/, ''),
+        description: description.trim(),
+        folder_id: folderId || null,
+        unit_number: unitNumber ? parseInt(unitNumber) : null,
+        unit_title: selectedUnitObj?.title || '',
+        publication_status: publicationStatus,
+        is_public: isPublic,
+      });
 
-        await materialService.uploadMaterial(subjectId, teacherId, file, {
-          title: docTitle,
-          description,
-          folder_id: folderId || null,
-          unit_number: unitNumber ? parseInt(unitNumber) : null,
-          unit_title: selectedUnitObj?.title || '',
-          publication_status: publicationStatus,
-        });
-
-        setProgress(Math.round(((i + 1) / files.length) * 100));
-      }
-
+      setProgress(100);
       onUploaded();
       onClose();
-      // Reset form
-      setFiles([]);
+
+      // Limpiar formulario
+      setFile(null);
       setTitle('');
       setDescription('');
       setFolderId('');
       setUnitNumber('');
+      setPublicationStatus('published');
     } catch (err) {
-      setErrorMsg(err.message || 'Error durante la subida del documento.');
+      setErrorMsg(err.message || 'Error durante la subida del documento PDF.');
     } finally {
       setUploading(false);
       setProgress(0);
@@ -93,87 +92,93 @@ export const MaterialUploadModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Subir Materiales a la Biblioteca Anual"
+      title="Subir Documento PDF a la Biblioteca"
       maxWidth="560px"
     >
       <form onSubmit={handleSubmit}>
         {errorMsg && (
-          <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <AlertCircle size={18} /> {errorMsg}
+          <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
+            <span>{errorMsg}</span>
           </div>
         )}
 
-        {/* Drag/Select Box */}
+        {/* Zona de selección de archivo PDF */}
         <div style={{
           border: '2px dashed var(--border-medium)',
           borderRadius: 'var(--radius-md)',
           padding: '1.75rem',
           textAlign: 'center',
-          backgroundColor: 'var(--bg-muted)',
+          backgroundColor: file ? 'var(--primary-50)' : 'var(--bg-muted)',
           marginBottom: '1.25rem',
           cursor: 'pointer',
+          transition: 'all 0.2s',
         }}>
-          <Upload size={32} color="var(--primary-800)" style={{ margin: '0 auto 0.75rem' }} />
-          <label htmlFor="file-upload-input" style={{ cursor: 'pointer' }}>
-            <span style={{ fontWeight: 600, color: 'var(--primary-800)', textDecoration: 'underline' }}>
-              Hacé clic para seleccionar archivos
-            </span>{' '}
-            o arrastralos aquí
-            <input
-              id="file-upload-input"
-              type="file"
-              multiple
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-            />
-          </label>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Formatos admitidos: PDF, Word (DOC/DOCX), Diapositivas (PPT/PPTX), Excel (XLS/XLSX), Texto e Imágenes. Máx 50MB.
-          </div>
-
-          {files.length > 0 && (
-            <div style={{ marginTop: '1rem', textAlign: 'left', backgroundColor: 'var(--bg-surface)', padding: '0.75rem', borderRadius: 'var(--radius-sm)' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem' }}>
-                {files.length} archivo(s) seleccionado(s):
+          {file ? (
+            <div>
+              <FileCheck size={36} color="var(--primary-700)" style={{ margin: '0 auto 0.5rem' }} />
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--primary-900)' }}>
+                {file.name}
               </div>
-              {files.map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  <FileText size={14} /> {f.name} ({(f.size / (1024 * 1024)).toFixed(2)} MB)
-                </div>
-              ))}
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                Tamaño: {(file.size / (1024 * 1024)).toFixed(2)} MB • Formato PDF verificado
+              </div>
+              <label htmlFor="file-upload-input" style={{ display: 'inline-block', marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--primary-700)', textDecoration: 'underline', cursor: 'pointer' }}>
+                Cambiar archivo PDF
+              </label>
+            </div>
+          ) : (
+            <div>
+              <Upload size={32} color="var(--primary-800)" style={{ margin: '0 auto 0.75rem' }} />
+              <label htmlFor="file-upload-input" style={{ cursor: 'pointer' }}>
+                <span style={{ fontWeight: 600, color: 'var(--primary-800)', textDecoration: 'underline' }}>
+                  Hacé clic para seleccionar el archivo PDF
+                </span>{' '}
+                o arrastralo aquí
+              </label>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                Formato admitido: <strong>Documentos PDF (.pdf)</strong>. Tamaño máximo: 50MB.
+              </div>
             </div>
           )}
+          <input
+            id="file-upload-input"
+            type="file"
+            accept=".pdf,application/pdf"
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+          />
         </div>
 
-        {/* Title for single file */}
-        {files.length <= 1 && (
-          <div className="form-group">
-            <label className="form-label">Título del Documento</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Ej: Guía de Lectura N° 1 - Mitos del NOA"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required={files.length === 1}
-            />
-          </div>
-        )}
-
+        {/* Título del documento */}
         <div className="form-group">
-          <label className="form-label">Descripción Pedagógica (Opcional)</label>
+          <label className="form-label">Título del Documento PDF *</label>
+          <input
+            type="text"
+            required
+            className="form-input"
+            placeholder="Ej: Guía de Lectura N° 1 - Mitos Riojanos"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
+
+        {/* Descripción pedagógica */}
+        <div className="form-group">
+          <label className="form-label">Descripción Breve / Indicaciones Pedagógicas (Opcional)</label>
           <textarea
             className="form-textarea"
             rows="2"
-            placeholder="Indicaciones para los alumnos sobre cómo utilizar este material..."
+            placeholder="Indicaciones para los alumnos sobre cómo abordar esta lectura..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
 
+        {/* Carpeta y Unidad temática */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Carpeta</label>
+            <label className="form-label">Carpeta Organizadora</label>
             <select
               className="form-select"
               value={folderId}
@@ -187,7 +192,7 @@ export const MaterialUploadModal = ({
           </div>
 
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Unidad Temática</label>
+            <label className="form-label">Tema / Unidad Correspondiente</label>
             <select
               className="form-select"
               value={unitNumber}
@@ -201,6 +206,7 @@ export const MaterialUploadModal = ({
           </div>
         </div>
 
+        {/* Estado de Publicación */}
         <div className="form-group">
           <label className="form-label">Estado de Publicación</label>
           <select
@@ -208,16 +214,32 @@ export const MaterialUploadModal = ({
             value={publicationStatus}
             onChange={(e) => setPublicationStatus(e.target.value)}
           >
-            <option value="published">Publicado (Visible para alumnos autorizados)</option>
+            <option value="published">Publicado (Visible y descargable para alumnos inscriptos)</option>
             <option value="draft">Borrador (Solo visible para docentes)</option>
             <option value="hidden">Oculto temporalmente</option>
           </select>
         </div>
 
+        {/* Autorización como fuente pública del Tutor IA */}
+        <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              style={{ width: '16px', height: '16px', accentColor: 'var(--brand-blue)' }}
+            />
+            <span style={{ fontWeight: 600, color: 'var(--primary-900)' }}>
+              Habilitar como fuente pública del Tutor IA (permite consultas libres a visitantes e invitados)
+            </span>
+          </label>
+        </div>
+
+        {/* Barra de progreso durante la subida */}
         {uploading && (
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.3rem' }}>
-              <span>Subiendo archivo al almacenamiento institucional...</span>
+              <span>Subiendo documento PDF a Supabase Storage...</span>
               <span>{progress}%</span>
             </div>
             <div style={{ height: '6px', backgroundColor: 'var(--border-light)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' }}>
@@ -230,8 +252,8 @@ export const MaterialUploadModal = ({
           <button type="button" onClick={onClose} className="btn btn-secondary" disabled={uploading}>
             Cancelar
           </button>
-          <button type="submit" className="btn btn-primary" disabled={uploading || files.length === 0}>
-            {uploading ? 'Subiendo...' : 'Guardar en la Biblioteca'}
+          <button type="submit" className="btn btn-primary" disabled={uploading || !file}>
+            {uploading ? 'Guardando en Supabase...' : 'Guardar en la Biblioteca'}
           </button>
         </div>
       </form>

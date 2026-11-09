@@ -1,16 +1,25 @@
 import { supabase } from '../config/supabaseClient';
 
+const withTimeout = (promise, ms = 2000) => {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Query timeout')), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+};
+
 export const previousSubjectsService = {
   // Get student's previous subjects preparations
   async getStudentPreps(studentId) {
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('previous_subjects_prep')
         .select(`
           *,
           subjects (*, courses (*))
         `)
         .eq('student_id', studentId);
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return data || [];
     } catch {
@@ -31,11 +40,12 @@ export const previousSubjectsService = {
     };
 
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('previous_subjects_prep')
         .upsert(record, { onConflict: 'student_id,subject_id' })
         .select(`*, subjects (*, courses (*))`)
         .single();
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return data;
     } catch {
@@ -67,7 +77,7 @@ export const previousSubjectsService = {
     const progress = totalUnits > 0 ? Math.round((completed.length / totalUnits) * 100) : 0;
 
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('previous_subjects_prep')
         .update({
           completed_units: completed,
@@ -77,6 +87,7 @@ export const previousSubjectsService = {
         .eq('subject_id', subjectId)
         .select()
         .single();
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return data;
     } catch {
@@ -93,7 +104,7 @@ export const previousSubjectsService = {
   // Update target date or personal study notes
   async updateStudyPlan(studentId, subjectId, { targetExamDate, notes }) {
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('previous_subjects_prep')
         .update({
           target_exam_date: targetExamDate,
@@ -103,6 +114,7 @@ export const previousSubjectsService = {
         .eq('subject_id', subjectId)
         .select()
         .single();
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return data;
     } catch {

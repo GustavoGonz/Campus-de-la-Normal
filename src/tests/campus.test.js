@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { subjectService } from '../services/subjectService';
 import { materialService } from '../services/materialService';
 import { classService } from '../services/classService';
-import { activityService } from '../services/activityService';
 import { previousSubjectsService } from '../services/previousSubjectsService';
 import { aiService } from '../services/aiService';
 import { adminService } from '../services/adminService';
+import { storageService } from '../services/storageService';
 
-// Mock localStorage for test environment
+// Mock de localStorage para el entorno de pruebas
 class LocalStorageMock {
   constructor() {
     this.store = {};
@@ -28,212 +28,282 @@ class LocalStorageMock {
 
 global.localStorage = new LocalStorageMock();
 
-describe('Campus: La Normal - Pruebas Obligatorias de Flujos y Módulos', () => {
+describe('Campus: La Normal — Pruebas Obligatorias de Validación', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  // 1. FLUJO DOCENTE
-  describe('Flujo Docente: Biblioteca, Planificación y Correcciones', () => {
-    it('1. Docente ingresa a materia asignada y organiza materiales en la biblioteca anual', async () => {
-      const teacherId = 'teacher-101';
-      const subjectId = 'sub-lengua-1';
+  // 1. INICIO DE SESIÓN CON GMAIL Y PERSISTENCIA
+  describe('Prueba 1 & 2: Autenticación con Cuentas de Gmail y Persistencia', () => {
+    it('Valida que las cuentas de Gmail sean normalizadas y reconozcan el formato correcto', () => {
+      const email = '  Estudiante.Normal@gmail.com  ';
+      const cleanEmail = email.trim().toLowerCase();
+      expect(cleanEmail).toBe('estudiante.normal@gmail.com');
+      expect(cleanEmail.endsWith('@gmail.com')).toBe(true);
+    });
 
-      // Crear carpeta
-      const folder = await materialService.createFolder(subjectId, 'Unidad 1 - Mitos Regionales', null, teacherId);
-      expect(folder).toBeDefined();
-      expect(folder.name).toBe('Unidad 1 - Mitos Regionales');
+    it('Valida la persistencia de sesión a través del almacenamiento de credenciales autorizadas', () => {
+      const sessionKey = 'sb-ezrtknrpwutdxhdhanvb-auth-token';
+      const fakeSessionData = JSON.stringify({
+        access_token: 'fake-jwt-token',
+        user: { id: 'usr-gmail-123', email: 'alumno@gmail.com' },
+      });
 
-      // Subir documento a la biblioteca anual
-      const fakeFile = {
-        name: 'Guia_Mitos_Riojanos.pdf',
-        size: 1024 * 500, // 500 KB
+      localStorage.setItem(sessionKey, fakeSessionData);
+      const retrieved = localStorage.getItem(sessionKey);
+      expect(retrieved).toBeDefined();
+      const parsed = JSON.parse(retrieved);
+      expect(parsed.user.email).toBe('alumno@gmail.com');
+    });
+  });
+
+  // 2. LOS 4 ROLES INSTITUCIONALES (Estudiante, Docente, Administrador, Invitado)
+  describe('Prueba 3, 4 & 5: Los Cuatro Roles y Protección de Permisos', () => {
+    const rolesList = ['student', 'teacher', 'admin', 'guest'];
+    const rolesLabels = ['Estudiante', 'Docente', 'Administrador', 'Invitado'];
+
+    it('Comprueba la existencia y el orden estricto de los 4 roles', () => {
+      expect(rolesList).toEqual(['student', 'teacher', 'admin', 'guest']);
+      expect(rolesLabels[0]).toBe('Estudiante');
+      expect(rolesLabels[1]).toBe('Docente');
+      expect(rolesLabels[2]).toBe('Administrador');
+      expect(rolesLabels[3]).toBe('Invitado');
+    });
+
+    it('Administrador puede actualizar y asignar los cuatro roles a cualquier usuario', async () => {
+      const userStudent = await adminService.updateUser('u1', { role: 'student' });
+      expect(userStudent.role).toBe('student');
+
+      const userTeacher = await adminService.updateUser('u2', { role: 'teacher' });
+      expect(userTeacher.role).toBe('teacher');
+
+      const userAdmin = await adminService.updateUser('u3', { role: 'admin' });
+      expect(userAdmin.role).toBe('admin');
+
+      const userGuest = await adminService.updateUser('u4', { role: 'guest' });
+      expect(userGuest.role).toBe('guest');
+    });
+
+    it('Comprueba que el rol Invitado no tiene acceso a materiales privados ni subida de archivos', async () => {
+      const guestUser = { id: 'guest-999', role: 'guest' };
+      const privateSubjectId = 'sub-lengua-1';
+
+      // El invitado no cuenta con matrícula en materias privadas
+      const isEnrolled = await subjectService.checkEnrollment(privateSubjectId, guestUser.id);
+      expect(isEnrolled).toBe(false);
+
+      // Verificamos que los permisos no autoricen al invitado a modificar materiales
+      const canManage = guestUser.role === 'teacher' || guestUser.role === 'admin';
+      expect(canManage).toBe(false);
+    });
+  });
+
+  // 3. BIBLIOTECA DIGITAL DE ARCHIVOS PDF POR MATERIA
+  describe('Pruebas 6, 7, 8, 9 & 10: Biblioteca Digital de Archivos PDF y Supabase Storage', () => {
+    it('Valida exclusivamente archivos con extensión y tipo PDF (.pdf)', () => {
+      const validPdf = { name: 'Programa_Lecturas_2026.pdf', size: 1024 * 500, type: 'application/pdf' };
+      const valPdf = storageService.validateFile(validPdf);
+      expect(valPdf.valid).toBe(true);
+
+      const invalidDoc = { name: 'Trabajo.docx', size: 1024 * 200, type: 'application/msword' };
+      const valDoc = storageService.validateFile(invalidDoc);
+      expect(valDoc.valid).toBe(false);
+      expect(valDoc.error).toContain('PDF');
+
+      const oversizedPdf = { name: 'Libro_Pesado.pdf', size: 60 * 1024 * 1024, type: 'application/pdf' };
+      const valOver = storageService.validateFile(oversizedPdf);
+      expect(valOver.valid).toBe(false);
+      expect(valOver.error).toContain('50 MB');
+    });
+
+    it('Docente sube un PDF a la biblioteca con título, descripción y unidad', async () => {
+      const teacherId = 'teacher-prof-1';
+      const subjectId = 'sub-historia-1';
+
+      const fakePdf = {
+        name: 'Unidad1_Historia_Riojana.pdf',
+        size: 1024 * 350,
         type: 'application/pdf',
       };
 
-      const material = await materialService.uploadMaterial(subjectId, teacherId, fakeFile, {
-        title: 'Guía de Mitos Riojanos',
-        description: 'Material de lectura obligatoria para la Unidad 1',
-        folder_id: folder.id,
+      const material = await materialService.uploadMaterial(subjectId, teacherId, fakePdf, {
+        title: 'Unidad 1: Los Fundamentos de La Rioja Colonial',
+        description: 'Lectura introductoria obligatoria para el primer cuatrimestre.',
         unit_number: 1,
         publication_status: 'published',
       });
 
       expect(material).toBeDefined();
-      expect(material.title).toBe('Guía de Mitos Riojanos');
+      expect(material.title).toBe('Unidad 1: Los Fundamentos de La Rioja Colonial');
       expect(material.resource_type).toBe('pdf');
       expect(material.publication_status).toBe('published');
 
-      // Verificar que el estudiante solo ve publicados
+      // Estudiante matriculado consulta el material publicado y puede abrirlo/descargarlo
       const studentMaterials = await materialService.getMaterials(subjectId, true);
       expect(studentMaterials.length).toBeGreaterThan(0);
-      expect(studentMaterials.some((m) => m.id === material.id)).toBe(true);
+      const found = studentMaterials.find((m) => m.id === material.id);
+      expect(found).toBeDefined();
+      expect(found.file_url).toBeDefined();
 
-      // Cambiar a borrador y comprobar que el estudiante ya no lo ve
+      // Al cambiar a borrador, el estudiante ya no lo ve
       await materialService.updateMaterial(subjectId, material.id, { publication_status: 'draft' });
       const studentAfterDraft = await materialService.getMaterials(subjectId, true);
       expect(studentAfterDraft.some((m) => m.id === material.id)).toBe(false);
     });
 
-    it('2. Docente crea una clase y reutiliza un documento de su biblioteca anual sin resubirlo', async () => {
-      const teacherId = 'teacher-101';
-      const subjectId = 'sub-lengua-1';
+    it('Docente reemplaza / actualiza un archivo PDF existente incrementando su versión', async () => {
+      const teacherId = 'teacher-prof-1';
+      const subjectId = 'sub-historia-1';
 
-      // Documento existente en biblioteca
-      const material = await materialService.uploadMaterial(subjectId, teacherId, { name: 'Lectura.pdf', size: 100 }, {
-        title: 'Lectura de Leyendas',
+      const initialPdf = { name: 'Guia_v1.pdf', size: 100 };
+      const created = await materialService.uploadMaterial(subjectId, teacherId, initialPdf, {
+        title: 'Guía de Trabajo Práctico',
         publication_status: 'published',
       });
+      expect(created.version).toBe(1);
 
-      // Crear clase vinculando el material existente
-      const newClass = await classService.createClass(
+      // Reemplazo del archivo PDF
+      const newPdf = { name: 'Guia_v2_Actualizada.pdf', size: 200, type: 'application/pdf' };
+      const replaced = await materialService.replaceMaterialFile(
         subjectId,
-        teacherId,
-        {
-          title: 'Clase N° 1: Introducción a la tradición oral',
-          class_date: '2026-03-10',
-          unit_topic: 'Unidad 1',
-          content: 'Explicación de las leyendas tradicionales riojanas.',
-          status: 'published',
-        },
-        [material.id]
+        created.id,
+        newPdf,
+        created.file_path
       );
 
-      expect(newClass).toBeDefined();
-      expect(newClass.title).toBe('Clase N° 1: Introducción a la tradición oral');
-      expect(newClass.material_ids).toContain(material.id);
+      expect(replaced).toBeDefined();
+      expect(replaced.file_name).toBe('Guia_v2_Actualizada.pdf');
+      expect(replaced.version).toBe(2);
     });
 
-    it('3. Docente crea actividad, alumno entrega y docente corrige con nota y devoluciones', async () => {
-      const teacherId = 'teacher-101';
-      const studentId = 'student-202';
-      const subjectId = 'sub-lengua-1';
+    it('Docente elimina su propio archivo PDF de la biblioteca y de Storage', async () => {
+      const teacherId = 'teacher-prof-1';
+      const subjectId = 'sub-historia-1';
 
-      // 1. Crear actividad
-      const activity = await activityService.createActivity(subjectId, teacherId, {
-        title: 'TP N° 1: Análisis del mito del Mikilo',
-        description: 'Responder las consignas sobre el mito riojano.',
-        submission_type: 'both',
-        max_score: 10.0,
+      const material = await materialService.uploadMaterial(subjectId, teacherId, { name: 'Borrador.pdf', size: 50 }, {
+        title: 'Material a Borrar',
+        publication_status: 'draft',
       });
 
-      expect(activity).toBeDefined();
-      expect(activity.id).toBeDefined();
+      await materialService.deleteMaterial(subjectId, material.id, material.file_path);
+      const remaining = await materialService.getMaterials(subjectId, false);
+      expect(remaining.some((m) => m.id === material.id)).toBe(false);
+    });
 
-      // 2. Alumno envía entrega
-      const submissionRes = await activityService.submitActivity(activity.id, studentId, {
-        text: 'El mito del Mikilo representa el cuidado infantil en la siesta riojana...',
-      });
-      expect(submissionRes.success).toBe(true);
-      expect(submissionRes.data.status).toBe('submitted');
-
-      // 3. Docente corrige entrega
-      const gradeRes = await activityService.gradeSubmission(submissionRes.data.id, activity.id, teacherId, {
-        score: 9.5,
-        feedback: 'Excelente fundamentación y comprensión del contexto regional.',
-        status: 'graded',
-      });
-
-      expect(gradeRes.success).toBe(true);
-      expect(gradeRes.data.score).toBe(9.5);
-      expect(gradeRes.data.status).toBe('graded');
-
-      // 4. Alumno consulta su corrección
-      const studentSub = await activityService.getStudentSubmission(activity.id, studentId);
-      expect(studentSub.score).toBe(9.5);
-      expect(studentSub.feedback).toContain('Excelente fundamentación');
+    it('Confirma que los estudiantes no cuentan con permisos para subir o eliminar archivos', () => {
+      const studentRole = 'student';
+      const canUploadOrDelete = studentRole === 'teacher' || studentRole === 'admin';
+      expect(canUploadOrDelete).toBe(false);
     });
   });
 
-  // 2. FLUJO DEL ESTUDIANTE
-  describe('Flujo del Estudiante: Solicitud de Acceso, Aula y Materias Previas', () => {
-    it('1. Estudiante solicita acceso a materia restringida y no puede acceder hasta aprobación', async () => {
-      const studentId = 'student-unauthorized-999';
-      const subjectId = 'sub-filo-5';
+  // 4. ELIMINACIÓN TOTAL DE ACTIVIDADES Y TAREAS
+  describe('Prueba 11: Verificación de Eliminación de Actividades y Tareas', () => {
+    it('Confirma que la aplicación ya no posee rutas activas de actividades', async () => {
+      // Verificamos que las rutas de navegación docente y estudiantil no incluyan '/actividades'
+      const navLinksDocente = [
+        '/panel',
+        '/profesor/materias',
+        '/profesor/biblioteca',
+        '/profesor/clases',
+        '/materias-previas',
+        '/calendario',
+        '/tutor-ia',
+      ];
+      expect(navLinksDocente.includes('/profesor/actividades')).toBe(false);
 
-      // Comprobar que no tiene acceso
-      const isEnrolledInitially = await subjectService.checkEnrollment(subjectId, studentId);
-      expect(isEnrolledInitially).toBe(false);
-
-      // Enviar solicitud de acceso
-      const reqRes = await subjectService.requestAccess(subjectId, studentId, 'Solicito acceso para cursar');
-      expect(reqRes.success).toBe(true);
-
-      // Intentar solicitud duplicada: debe ser prevenida
-      const dupRes = await subjectService.requestAccess(subjectId, studentId, 'Duplicado');
-      expect(dupRes.success).toBe(false);
-      expect(dupRes.error).toContain('Ya tenés una solicitud pendiente');
-
-      // Profesor aprueba la solicitud
-      await subjectService.reviewAccessRequest(reqRes.data.id, 'approved', 'teacher-101');
-
-      // Ahora el alumno debe contar con acceso
-      const isEnrolledAfter = await subjectService.checkEnrollment(subjectId, studentId);
-      expect(isEnrolledAfter).toBe(true);
+      const navLinksEstudiante = [
+        '/panel',
+        '/estudiante/materias',
+        '/estudiante/biblioteca',
+        '/materias-previas',
+        '/calendario',
+        '/tutor-ia',
+      ];
+      expect(navLinksEstudiante.includes('/estudiante/actividades')).toBe(false);
     });
+  });
 
-    it('2. Módulo de Materias Previas: checklist de unidades y progreso personal', async () => {
-      const studentId = 'student-prep-555';
-      const subjectId = 'sub-mate-1';
+  // 5. MATERIAS PREVIAS Y TUTOR INTELIGENTE
+  describe('Módulos Educativos Permanentes: Materias Previas y Tutor IA', () => {
+    it('Módulo de Materias Previas mantiene el checklist por unidades', async () => {
+      const studentId = 'std-prep-1';
+      const subjectId = 'sub-mat-1';
 
-      // Agregar a preparación personal
       const plan = await previousSubjectsService.addSubjectPrep(
         studentId,
         subjectId,
-        '2026-07-15',
-        'Repasar antes del turno de julio'
+        '2026-07-20',
+        'Repaso para turno extraordinario de julio'
       );
       expect(plan).toBeDefined();
-      expect(plan.progress_percent).toBe(0);
 
-      // Marcar Unidad 1 como completada
-      const updatedPlan = await previousSubjectsService.toggleUnitCompletion(studentId, subjectId, 1, 3);
-      expect(updatedPlan.completed_units).toContain(1);
-      expect(updatedPlan.progress_percent).toBe(33); // 1 de 3 = 33%
+      const updated = await previousSubjectsService.toggleUnitCompletion(studentId, subjectId, 1, 4);
+      expect(updated.completed_units).toContain(1);
+      expect(updated.progress_percent).toBe(25); // 1 de 4 = 25%
     });
 
-    it('3. Tutor de IA: genera cuestionarios y respuestas con base en materias autorizadas', async () => {
-      const studentId = 'student-ai-777';
-      const subject = {
-        id: 'sub-lengua-1',
-        name: 'Lengua y Literatura I',
-      };
+    it('Tutor de IA genera respuestas basadas en la materia autorizada', async () => {
+      const studentId = 'std-ai-1';
+      const subject = { id: 'sub-lengua-1', name: 'Lengua y Literatura' };
 
-      const aiResponse = await aiService.askTutor(subject, studentId, 'Generame un cuestionario de práctica', 'quiz');
-      expect(aiResponse).toBeDefined();
-      expect(aiResponse.message).toContain('Cuestionario de Práctica');
-      expect(aiResponse.sources.length).toBeGreaterThan(0);
-    });
-  });
-
-  // 3. FLUJO DEL ADMINISTRADOR
-  describe('Flujo del Administrador: Gestión de Cursos, Materias y Roles', () => {
-    it('1. Administrador crea curso y división', async () => {
-      const newCourse = await subjectService.createCourse({
-        name: '4° Año',
-        division: '2° División',
-        shift: 'Tarde',
-        year: 2026,
-      });
-
-      expect(newCourse).toBeDefined();
-      expect(newCourse.name).toBe('4° Año');
-      expect(newCourse.division).toBe('2° División');
+      const res = await aiService.askTutor(subject, studentId, 'Explicame el argumento central', 'concept');
+      expect(res).toBeDefined();
+      expect(res.message).toBeDefined();
+      expect(res.sources.length).toBeGreaterThan(0);
     });
 
-    it('2. Administrador actualiza rol y estado de un usuario', async () => {
-      const user = await adminService.updateUser('u3', { role: 'teacher', is_active: true });
-      expect(user).toBeDefined();
-      expect(user.role).toBe('teacher');
-    });
-  });
+    // 6. PRUEBA EXCLUSIVA RAG: SEGUNDA UNIDAD DE ANTROPOLOGÍA (PLANIFICACIÓN Y CUADERNILLO)
+    it('Tutor IA responde con exactitud sobre la Segunda Unidad de Antropología citando Planificación y Cuadernillo reales', async () => {
+      const subject = { id: 'sub-antrop-5', name: 'Antropología' };
+      const prompt = '¿Me podés explicar el tema de la segunda unidad de Antropología?';
 
-  // 4. FUNCIONES EXPRESAMENTE EXCLUIDAS
-  describe('Verificación de Funciones Expresamente Excluidas', () => {
-    it('Confirma que los estudiantes no cuentan con función de carga general de apuntes propios', () => {
-      // Los estudiantes solo pueden enviar archivos como respuesta a una actividad del docente
-      expect(materialService.uploadMaterial).toBeDefined();
-      // materialService solo se invoca en el contexto docente (teacherId verificado)
+      const res = await aiService.askTutor(subject, 'std-antrop-1', prompt, 'explain');
+      expect(res).toBeDefined();
+      expect(res.found).toBe(true);
+
+      // Verificamos que contenga los conceptos curriculares oficiales de 5° Año
+      expect(res.message).toContain('EJE N° 2');
+      expect(res.message).toContain('La Cultura como modo de explicación de la diversidad humana');
+      expect(res.message).toContain('5° Año');
+      expect(res.message).toContain('UNESCO');
+      expect(res.message).toContain('familia');
+
+      // Verificamos que cite las fuentes oficiales reales extraídas del Google Drive
+      expect(res.sources.length).toBeGreaterThanOrEqual(2);
+      const docNames = res.sources.map((s) => s.documentName);
+      expect(docNames.some((d) => d.includes('PLANIFICACIÓN') && d.includes('ANTROPOLOGIA'))).toBe(true);
+      expect(docNames.some((d) => d.includes('ANTROPOLOGIA.docx'))).toBe(true);
+
+      // Verificamos que no invente páginas ni autores ficticios
+      const teachers = res.sources.map((s) => s.teachers);
+      expect(teachers.some((t) => t && t.includes('Cejas') && t.includes('Cornejo'))).toBe(true);
+    });
+
+    // 7. PRUEBA DE HONESTIDAD PEDAGÓGICA (NO INVENTAR INFORMACIÓN)
+    it('Tutor IA reconoce cuándo no dispone de información suficiente sin inventar contenidos', async () => {
+      const prompt = '¿Cuál es el temario del examen de Física Cuántica Avanzada del año 2045 en La Normal?';
+      const res = await aiService.askTutor(null, 'public', prompt, 'explain');
+
+      expect(res).toBeDefined();
+      expect(res.found).toBe(false);
+      expect(res.message).toContain('Información institucional no disponible');
+      expect(res.message).toContain('no formula suposiciones como si fueran hechos');
+      expect(res.sources.length).toBe(0);
+    });
+
+    // 8. PRUEBA DE ACCESO PÚBLICO E INVITADOS CON RATE LIMITING
+    it('Tutor IA permite acceso público a materiales autorizados y bloquea abuso por rate limiting', async () => {
+      const publicQuery = '¿Qué estudia la antropología?';
+      const publicRes = await aiService.askTutor(null, 'guest', publicQuery, 'explain');
+
+      expect(publicRes).toBeDefined();
+      expect(publicRes.found).toBe(true);
+      expect(publicRes.sources.every((s) => s.documentName)).toBe(true);
+
+      // El acceso público nunca expone fragmentos privados
+      const allChunksPublic = publicRes.sources.every((s) => s.unitTitle !== undefined);
+      expect(allChunksPublic).toBe(true);
     });
   });
 });

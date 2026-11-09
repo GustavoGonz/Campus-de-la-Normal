@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
-import { User, Shield, Key, Mail, CheckCircle, Save } from 'lucide-react';
+import { User, Shield, Key, Mail, CheckCircle, Save, BookOpen, GraduationCap, UserCheck } from 'lucide-react';
+import { InstitutionalLogo } from '../../components/common/InstitutionalLogo';
 
 export const ProfilePage = () => {
-  const { user, profile, updateProfile, signOut } = useAuth();
+  const { user, profile, updateProfile, isGuest, isAdmin, isTeacher, isStudent } = useAuth();
   const { showToast } = useNotifications();
 
   const [fullName, setFullName] = useState(profile?.full_name || '');
@@ -28,15 +29,28 @@ export const ProfilePage = () => {
     }
   };
 
+  const getRoleDisplay = () => {
+    if (isAdmin) return { name: 'Administrador', badgeClass: 'badge-danger', icon: Shield };
+    if (isTeacher) return { name: 'Docente', badgeClass: 'badge-primary', icon: BookOpen };
+    if (isGuest) return { name: 'Invitado', badgeClass: 'badge-neutral', icon: UserCheck };
+    return { name: 'Estudiante', badgeClass: 'badge-success', icon: GraduationCap };
+  };
+
+  const roleInfo = getRoleDisplay();
+  const RoleIcon = roleInfo.icon;
+
   return (
     <div style={{ maxWidth: '640px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '1.75rem' }}>
-        <h1 style={{ fontSize: '1.85rem', color: 'var(--primary-900)', marginBottom: '0.4rem' }}>
-          Mi Perfil y Configuración
-        </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-          Información personal y datos de tu cuenta institucional en Campus: La Normal.
-        </p>
+      <div style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.85rem', color: 'var(--primary-900)', marginBottom: '0.4rem', fontFamily: 'var(--font-display)' }}>
+            Mi Perfil y Configuración
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0 }}>
+            Información personal y datos de tu cuenta en Campus: La Normal.
+          </p>
+        </div>
+        <InstitutionalLogo variant="symbol" size="sm" />
       </div>
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>
@@ -59,12 +73,12 @@ export const ProfilePage = () => {
             <h2 style={{ fontSize: '1.35rem', color: 'var(--primary-900)', margin: '0 0 0.2rem' }}>
               {profile?.full_name || 'Usuario'}
             </h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span className={`badge ${profile?.role === 'admin' ? 'badge-danger' : profile?.role === 'teacher' ? 'badge-primary' : 'badge-success'}`}>
-                {profile?.role === 'admin' ? 'Administrador' : profile?.role === 'teacher' ? 'Profesor / Docente' : 'Estudiante'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span className={`badge ${roleInfo.badgeClass}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                <RoleIcon size={12} /> {roleInfo.name}
               </span>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                {user?.email}
+                {user?.email || profile?.email}
               </span>
             </div>
           </div>
@@ -83,7 +97,7 @@ export const ProfilePage = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Correo Institucional (No modificable)</label>
+            <label className="form-label">Correo Electrónico (No modificable)</label>
             <input
               type="email"
               disabled
@@ -94,32 +108,44 @@ export const ProfilePage = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Teléfono de Contacto (Opcional)</label>
+            <label className="form-label">Rol en la Plataforma (Asignado institucionalmente)</label>
             <input
               type="text"
+              disabled
               className="form-input"
-              placeholder="+54 380 4..."
+              style={{ backgroundColor: 'var(--bg-muted)', color: 'var(--text-muted)', fontWeight: 600 }}
+              value={roleInfo.name}
+            />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+              Por seguridad, la modificación de roles sólo puede ser realizada por el Administrador.
+            </span>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Teléfono de Contacto</label>
+            <input
+              type="tel"
+              className="form-input"
+              placeholder="Ej: +54 380 4123456"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Biografía o Presentación Breve</label>
+            <label className="form-label">Biografía o Presentación</label>
             <textarea
               className="form-textarea"
               rows="3"
-              placeholder="Presentación para tu comunidad académica..."
+              placeholder="Breve reseña sobre tus intereses o materias..."
               value={bio}
               onChange={(e) => setBio(e.target.value)}
             />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              <Save size={16} /> {saving ? 'Guardando...' : 'Guardar Cambios'}
-            </button>
-          </div>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={saving}>
+            <Save size={16} /> {saving ? 'Guardando cambios...' : 'Guardar Información'}
+          </button>
         </form>
       </div>
     </div>

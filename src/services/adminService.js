@@ -1,13 +1,22 @@
 import { supabase } from '../config/supabaseClient';
 
+const withTimeout = (promise, ms = 800) => {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Admin query timeout')), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+};
+
 export const adminService = {
   // Get all registered users/profiles
   async getUsers() {
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       if (data && data.length > 0) return data;
       throw new Error('No remote users yet');
@@ -30,12 +39,13 @@ export const adminService = {
   // Update user role or active status
   async updateUser(userId, updates) {
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('profiles')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', userId)
         .select()
         .single();
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return data;
     } catch {
@@ -49,11 +59,12 @@ export const adminService = {
   // Assign teacher to subject
   async assignTeacher(subjectId, teacherId) {
     try {
-      const { data, error } = await supabase
+      const query = supabase
         .from('subject_teachers')
         .insert({ subject_id: subjectId, teacher_id: teacherId })
         .select()
         .single();
+      const { data, error } = await withTimeout(query);
       if (error) throw error;
       return data;
     } catch {
@@ -64,11 +75,12 @@ export const adminService = {
   // Remove teacher assignment
   async removeTeacher(subjectId, teacherId) {
     try {
-      await supabase
+      const query = supabase
         .from('subject_teachers')
         .delete()
         .eq('subject_id', subjectId)
         .eq('teacher_id', teacherId);
+      await withTimeout(query);
       return true;
     } catch {
       return true;
